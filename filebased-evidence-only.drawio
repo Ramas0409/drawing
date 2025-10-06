@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram id="evidence-flow" name="Evidence Data Flow">
+    <mxGraphModel dx="1434" dy="844" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="3800">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- TITLE -->
+        <mxCell id="title" value="EVIDENCE ATTACHMENT DATA FLOW - STEP BY STEP" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="20" width="1200" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 1: ZIP ARRIVAL -->
+        <mxCell id="step1-box" value="STEP 1: ZIP FILE ARRIVAL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#ef6c00;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="80" width="1200" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="step1-detail" value="Network uploads ZIP file to S3&#xa;&#xa;S3 Bucket: /inbound/chargeback_20250115.zip&#xa;Contents: chargeback.csv + image001.jpg + image002.pdf + receipt.png" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="110" y="110" width="1180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 2: S3 TRIGGER -->
+        <mxCell id="step2-box" value="STEP 2: S3 EVENT TRIGGER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="200" width="1200" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="step2-detail" value="S3 ObjectCreated event sent to SQS Queue&#xa;&#xa;SQS Queue: wdp-file-arrivals | Message: {bucket, key, file_name}" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="110" y="230" width="1180" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 3: FILE PROCESSOR EXTRACTION -->
+        <mxCell id="step3-box" value="STEP 3: FILE PROCESSOR - EXTRACT AND UPLOAD EVIDENCE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="300" width="1200" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="step3-detail" value="File Processor extracts ZIP contents and uploads evidence to S3 staging&#xa;&#xa;Extract: chargeback.csv (1000 rows) + 4 evidence files&#xa;Upload to: S3 /evidence-staging/file-job-123/image001.jpg, image002.pdf, receipt.png, dispute_proof.jpg&#xa;&#xa;Result: All evidence files now in S3 staging area" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="110" y="330" width="1180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 4: CREATE MANIFEST -->
+        <mxCell id="step4-box" value="STEP 4: CREATE EVIDENCE MANIFEST" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="440" width="1200" height="280" as="geometry"/>
+        </mxCell>
+        <mxCell id="step4-detail" value="Parse CSV and link evidence files to rows. INSERT manifest records into database&#xa;&#xa;TABLE: file_job_artifact (MANIFEST TABLE)&#xa;&#xa;+----------+---------------+------------+----------------------+---------------------------------------------+------------+------------------+&#xa;| id       | file_job_id   | row_number | original_filename    | s3_uri                                      | file_size  | content_type     |&#xa;+----------+---------------+------------+----------------------+---------------------------------------------+------------+------------------+&#xa;| uuid-1   | file-job-123  | 1          | image001.jpg         | s3://.../file-job-123/image001.jpg          | 2456789    | image/jpeg       |&#xa;| uuid-2   | file-job-123  | 1          | image002.pdf         | s3://.../file-job-123/image002.pdf          | 1234567    | application/pdf  |&#xa;| uuid-3   | file-job-123  | 5          | receipt.png          | s3://.../file-job-123/receipt.png           | 987654     | image/png        |&#xa;| uuid-4   | file-job-123  | 10         | dispute_proof.jpg    | s3://.../file-job-123/dispute_proof.jpg     | 3456789    | image/jpeg       |&#xa;+----------+---------------+------------+----------------------+---------------------------------------------+------------+------------------+&#xa;&#xa;Note: Row 1 has 2 evidence files (multiple records with row_number = 1)&#xa;      Row 5 has 1 evidence file&#xa;      Row 10 has 1 evidence file" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=9;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="470" width="1180" height="240" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 5: INSERT OUTBOX -->
+        <mxCell id="step5-box" value="STEP 5: INSERT TO OUTBOX WITH EVIDENCE FLAG" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="740" width="1200" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="step5-detail" value="For each CSV row, insert outbox record with evidence metadata&#xa;&#xa;TABLE: outbox&#xa;&#xa;Row 1 Outbox Record:&#xa;{event_type: CHARGEBACK_NEW, topic: chargeback.new.events, status: PENDING,&#xa; payload: {networkTransactionId: NET-001, HPAN: abc123..., amount: 100.00,&#xa;           hasEvidence: true, evidenceCount: 2, fileJobId: file-job-123, rowNumber: 1}}&#xa;&#xa;hasEvidence flag triggers evidence attachment flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="770" width="1180" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 6: PUBLISH TO KAFKA -->
+        <mxCell id="step6-box" value="STEP 6: PUBLISH SCHEDULER PUBLISHES TO KAFKA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8bbd0;strokeColor=#c2185b;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="820" width="1200" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="step6-detail" value="Publish Scheduler reads outbox table and publishes to Kafka&#xa;&#xa;TABLE READ: outbox WHERE status = PENDING&#xa;KAFKA TOPIC: chargeback.new.events&#xa;&#xa;Event Payload: {networkTransactionId, HPAN, amount, hasEvidence: true, evidenceCount: 2,&#xa;                fileJobId: file-job-123, rowNumber: 1}&#xa;&#xa;TABLE UPDATE: outbox SET status = PUBLISHED" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="850" width="1180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 7: CASE CREATION -->
+        <mxCell id="step7-box" value="STEP 7: NEW CASE CONSUMER CREATES CASE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b2dfdb;strokeColor=#00695c;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="960" width="1200" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="step7-detail" value="New Case Consumer receives Kafka event and creates case in DRAFT status&#xa;&#xa;TABLE INSERT: case&#xa;{id: case-001, case_number: CB-001, HPAN: abc123..., amount: 100.00, status: DRAFT}&#xa;&#xa;TABLE INSERT: case_action&#xa;{id: action-001, case_id: case-001, action_type: CH1, status: DRAFT, stage_number: 1}&#xa;&#xa;Case created but NO evidence attached yet (async)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="990" width="1180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 8: EMIT EVENTS -->
+        <mxCell id="step8-box" value="STEP 8: EMIT CASEDRAFTCREATED AND EVIDENCEATTACHREQUESTED EVENTS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1120" width="1200" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="step8-detail" value="New Case Consumer emits two events&#xa;&#xa;EVENT 1 - KAFKA TOPIC: case.lifecycle.events&#xa;{event: CaseDraftCreated, caseId: case-001, status: DRAFT}&#xa;&#xa;EVENT 2 - KAFKA TOPIC: evidence.requests (ONLY if hasEvidence = true)&#xa;{event: EvidenceAttachRequested, caseId: case-001, actionId: action-001,&#xa; fileJobId: file-job-123, rowNumber: 1}" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1150" width="1180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 9: EVIDENCE WORKER RECEIVES -->
+        <mxCell id="step9-box" value="STEP 9: EVIDENCE ATTACH WORKER RECEIVES EVENT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffccbc;strokeColor=#bf360c;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1260" width="1200" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="step9-detail" value="Evidence Attach Worker subscribes to evidence.requests topic&#xa;&#xa;KAFKA SUBSCRIBE: evidence.requests&#xa;RECEIVED EVENT: {caseId: case-001, actionId: action-001, fileJobId: file-job-123, rowNumber: 1}&#xa;&#xa;Worker starts processing evidence attachment" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1290" width="1180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 10: QUERY MANIFEST -->
+        <mxCell id="step10-box" value="STEP 10: QUERY EVIDENCE MANIFEST FROM DATABASE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1380" width="1200" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="step10-detail" value="Evidence Worker queries manifest table to get evidence file locations&#xa;&#xa;TABLE QUERY: file_job_artifact WHERE file_job_id = file-job-123 AND row_number = 1&#xa;&#xa;QUERY RESULT: 2 records&#xa;- Record 1: {id: uuid-1, original_filename: image001.jpg, s3_uri: s3://.../image001.jpg, file_size: 2456789}&#xa;- Record 2: {id: uuid-2, original_filename: image002.pdf, s3_uri: s3://.../image002.pdf, file_size: 1234567}&#xa;&#xa;Now worker knows WHERE the evidence files are stored in S3" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1410" width="1180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 11: VALIDATE S3 -->
+        <mxCell id="step11-box" value="STEP 11: VALIDATE EVIDENCE FILES EXIST IN S3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1540" width="1200" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="step11-detail" value="Evidence Worker validates each file exists in S3 before attaching&#xa;&#xa;S3 HEAD REQUEST: s3://.../evidence-staging/file-job-123/image001.jpg&#xa;RESULT: File exists, size = 2456789 bytes&#xa;&#xa;S3 HEAD REQUEST: s3://.../evidence-staging/file-job-123/image002.pdf&#xa;RESULT: File exists, size = 1234567 bytes&#xa;&#xa;Both files validated successfully" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1570" width="1180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 12: ATTACH TO CASE -->
+        <mxCell id="step12-box" value="STEP 12: ATTACH EVIDENCE TO CASE (INSERT LINK TABLE)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1680" width="1200" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="step12-detail" value="Evidence Worker inserts records into case_evidence LINK TABLE to connect evidence to case&#xa;&#xa;TABLE INSERT: case_evidence&#xa;&#xa;Link 1: {id: evidence-link-1, case_id: case-001, action_id: action-001, artifact_id: uuid-1,&#xa;         s3_uri: s3://.../image001.jpg, original_filename: image001.jpg,&#xa;         file_size: 2456789, content_type: image/jpeg, status: ATTACHED}&#xa;&#xa;Link 2: {id: evidence-link-2, case_id: case-001, action_id: action-001, artifact_id: uuid-2,&#xa;         s3_uri: s3://.../image002.pdf, original_filename: image002.pdf,&#xa;         file_size: 1234567, content_type: application/pdf, status: ATTACHED}&#xa;&#xa;EVIDENCE SUCCESSFULLY ATTACHED TO CASE" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1710" width="1180" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 13: EMIT COMPLETE -->
+        <mxCell id="step13-box" value="STEP 13: EMIT EVIDENCEATTACHED EVENT (COMPLETE)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a5d6a7;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1880" width="1200" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="step13-detail" value="Evidence Worker emits success event&#xa;&#xa;KAFKA TOPIC: evidence.lifecycle.events&#xa;EVENT: {event: EvidenceAttached, caseId: case-001, actionId: action-001, attachmentCount: 2,&#xa;        evidenceIds: [evidence-link-1, evidence-link-2]}&#xa;&#xa;EVIDENCE ATTACHMENT FLOW COMPLETE" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1910" width="1180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- TABLE REFERENCE SUMMARY -->
+        <mxCell id="tables-box" value="DATABASE TABLES INVOLVED - DDL STATEMENTS" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="100" y="2120" width="1200" height="1600" as="geometry"/>
+        </mxCell>
+        <mxCell id="tables-detail" value="1. file_job_artifact - MANIFEST TABLE (Created in Step 4)&#xa;&#xa;CREATE TABLE file_job_artifact (&#xa;    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),&#xa;    file_job_id         UUID NOT NULL,&#xa;    row_number          INTEGER NOT NULL,&#xa;    original_filename   VARCHAR(255) NOT NULL,&#xa;    s3_uri              VARCHAR(1024) NOT NULL,&#xa;    file_size           BIGINT NOT NULL,&#xa;    content_type        VARCHAR(100) NOT NULL,&#xa;    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    FOREIGN KEY (file_job_id) REFERENCES file_job(id) ON DELETE CASCADE&#xa;);&#xa;CREATE INDEX idx_artifact_file_job_row ON file_job_artifact(file_job_id, row_number);&#xa;CREATE INDEX idx_artifact_s3_uri ON file_job_artifact(s3_uri);&#xa;&#xa;---&#xa;&#xa;2. outbox - EVENT PUBLICATION TABLE (Written in Step 5, Read in Step 6)&#xa;&#xa;CREATE TABLE outbox (&#xa;    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),&#xa;    event_type          VARCHAR(100) NOT NULL,&#xa;    topic               VARCHAR(255) NOT NULL,&#xa;    payload             JSONB NOT NULL,&#xa;    status              VARCHAR(50) NOT NULL DEFAULT PENDING,&#xa;    dedupe_key          VARCHAR(255) NOT NULL,&#xa;    lookup_status       VARCHAR(50),&#xa;    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    published_at        TIMESTAMP,&#xa;    CONSTRAINT unique_dedupe_key UNIQUE (dedupe_key)&#xa;);&#xa;CREATE INDEX idx_outbox_status ON outbox(status, created_at);&#xa;CREATE INDEX idx_outbox_lookup_status ON outbox(lookup_status, created_at);&#xa;&#xa;---&#xa;&#xa;3. case - CASE TABLE (Created in Step 7)&#xa;&#xa;CREATE TABLE case (&#xa;    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),&#xa;    case_number             VARCHAR(50) NOT NULL UNIQUE,&#xa;    network_transaction_id  VARCHAR(100),&#xa;    hpan                    VARCHAR(64) NOT NULL,&#xa;    amount                  DECIMAL(15, 2) NOT NULL,&#xa;    currency                VARCHAR(3) NOT NULL DEFAULT USD,&#xa;    merchant_id             VARCHAR(100),&#xa;    merchant_name           VARCHAR(255),&#xa;    status                  VARCHAR(50) NOT NULL DEFAULT DRAFT,&#xa;    source_network          VARCHAR(50) NOT NULL,&#xa;    region                  VARCHAR(10) NOT NULL,&#xa;    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    updated_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP&#xa;);&#xa;CREATE INDEX idx_case_hpan ON case(hpan);&#xa;CREATE INDEX idx_case_status ON case(status);&#xa;CREATE INDEX idx_case_network_txn_id ON case(network_transaction_id);&#xa;&#xa;---&#xa;&#xa;4. case_action - ACTION TABLE (Created in Step 7)&#xa;&#xa;CREATE TABLE case_action (&#xa;    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),&#xa;    case_id             UUID NOT NULL,&#xa;    action_type         VARCHAR(50) NOT NULL,&#xa;    stage_number        INTEGER NOT NULL,&#xa;    status              VARCHAR(50) NOT NULL DEFAULT DRAFT,&#xa;    reason_code         VARCHAR(10),&#xa;    amount              DECIMAL(15, 2),&#xa;    currency            VARCHAR(3),&#xa;    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    closed_at           TIMESTAMP,&#xa;    FOREIGN KEY (case_id) REFERENCES case(id) ON DELETE CASCADE&#xa;);&#xa;CREATE INDEX idx_action_case_id ON case_action(case_id);&#xa;CREATE INDEX idx_action_status ON case_action(status);&#xa;CREATE INDEX idx_action_stage ON case_action(case_id, stage_number);&#xa;&#xa;---&#xa;&#xa;5. case_evidence - LINK TABLE (Created in Step 12)&#xa;&#xa;CREATE TABLE case_evidence (&#xa;    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),&#xa;    case_id             UUID NOT NULL,&#xa;    action_id           UUID,&#xa;    artifact_id         UUID NOT NULL,&#xa;    s3_uri              VARCHAR(1024) NOT NULL,&#xa;    original_filename   VARCHAR(255) NOT NULL,&#xa;    file_size           BIGINT NOT NULL,&#xa;    content_type        VARCHAR(100) NOT NULL,&#xa;    status              VARCHAR(50) NOT NULL DEFAULT ATTACHED,&#xa;    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    FOREIGN KEY (case_id) REFERENCES case(id) ON DELETE CASCADE,&#xa;    FOREIGN KEY (action_id) REFERENCES case_action(id) ON DELETE CASCADE,&#xa;    FOREIGN KEY (artifact_id) REFERENCES file_job_artifact(id) ON DELETE RESTRICT&#xa;);&#xa;CREATE INDEX idx_evidence_case_id ON case_evidence(case_id);&#xa;CREATE INDEX idx_evidence_action_id ON case_evidence(action_id);&#xa;CREATE INDEX idx_evidence_artifact_id ON case_evidence(artifact_id);&#xa;CREATE INDEX idx_evidence_status ON case_evidence(status);&#xa;&#xa;---&#xa;&#xa;6. file_job - FILE JOB TRACKING TABLE (Supporting table)&#xa;&#xa;CREATE TABLE file_job (&#xa;    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),&#xa;    file_name           VARCHAR(255) NOT NULL,&#xa;    source_network      VARCHAR(50) NOT NULL,&#xa;    total_rows          INTEGER NOT NULL,&#xa;    evidence_count      INTEGER NOT NULL DEFAULT 0,&#xa;    status              VARCHAR(50) NOT NULL DEFAULT PROCESSING,&#xa;    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    completed_at        TIMESTAMP,&#xa;    CONSTRAINT unique_file_network UNIQUE (file_name, source_network)&#xa;);&#xa;CREATE INDEX idx_file_job_status ON file_job(status);&#xa;&#xa;---&#xa;&#xa;7. file_job_row - ROW TRACKING TABLE (Supporting table)&#xa;&#xa;CREATE TABLE file_job_row (&#xa;    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),&#xa;    file_job_id         UUID NOT NULL,&#xa;    row_number          INTEGER NOT NULL,&#xa;    case_id             UUID,&#xa;    status              VARCHAR(50) NOT NULL DEFAULT PENDING,&#xa;    error_message       TEXT,&#xa;    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,&#xa;    FOREIGN KEY (file_job_id) REFERENCES file_job(id) ON DELETE CASCADE,&#xa;    FOREIGN KEY (case_id) REFERENCES case(id) ON DELETE SET NULL&#xa;);&#xa;CREATE INDEX idx_file_job_row_job_id ON file_job_row(file_job_id);&#xa;CREATE INDEX idx_file_job_row_status ON file_job_row(status);&#xa;&#xa;---&#xa;&#xa;TABLE RELATIONSHIPS AND KEY QUERIES:&#xa;&#xa;Chain of Custody (Evidence Traceability):&#xa;file_job -> file_job_artifact -> case_evidence -> case&#xa;&#xa;Get all evidence for a case:&#xa;SELECT ce.*, fja.original_filename, fja.s3_uri, fja.file_size&#xa;FROM case_evidence ce&#xa;JOIN file_job_artifact fja ON ce.artifact_id = fja.id&#xa;WHERE ce.case_id = ?;&#xa;&#xa;Trace evidence back to original file:&#xa;SELECT fj.file_name, fja.row_number, ce.case_id, c.case_number&#xa;FROM file_job fj&#xa;JOIN file_job_artifact fja ON fja.file_job_id = fj.id&#xa;JOIN case_evidence ce ON ce.artifact_id = fja.id&#xa;JOIN case c ON ce.case_id = c.id&#xa;WHERE fja.id = ?;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=8;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="2150" width="1180" height="1460" as="geometry"/>
+        </mxCell>
+
+        <!-- ARROWS -->
+        <mxCell id="arr1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#ef6c00;entryX=0.5;entryY=0;" edge="1" parent="1" source="step1-box" target="step2-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" edge="1" parent="1" source="step2-box" target="step3-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#c62828;entryX=0.5;entryY=0;" edge="1" parent="1" source="step3-box" target="step4-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;entryX=0.5;entryY=0;" edge="1" parent="1" source="step4-box" target="step5-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#6a1b9a;entryX=0.5;entryY=0;" edge="1" parent="1" source="step5-box" target="step6-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#c2185b;entryX=0.5;entryY=0;" edge="1" parent="1" source="step6-box" target="step7-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#00695c;entryX=0.5;entryY=0;" edge="1" parent="1" source="step7-box" target="step8-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57f17;entryX=0.5;entryY=0;" edge="1" parent="1" source="step8-box" target="step9-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#bf360c;entryX=0.5;entryY=0;" edge="1" parent="1" source="step9-box" target="step10-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#7b1fa2;entryX=0.5;entryY=0;" edge="1" parent="1" source="step10-box" target="step11-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" edge="1" parent="1" source="step11-box" target="step12-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;entryX=0.5;entryY=0;" edge="1" parent="1" source="step12-box" target="step13-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

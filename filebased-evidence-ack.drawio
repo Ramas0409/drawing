@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram id="complete-flow" name="Complete File Processing with Evidence and ACK">
+    <mxGraphModel dx="1434" dy="844" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="4800">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- TITLE -->
+        <mxCell id="title" value="COMPLETE FILE PROCESSING FLOW - EVIDENCE ATTACHMENT + ACK GENERATION" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="20" width="1200" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 1: ZIP ARRIVAL -->
+        <mxCell id="step1-box" value="STEP 1: ZIP FILE ARRIVAL WITH CSV AND EVIDENCE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#ef6c00;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="80" width="1200" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="step1-detail" value="Network uploads ZIP file to S3&#xa;&#xa;S3 Bucket: /inbound/chargeback_20250115.zip&#xa;Contents: chargeback.csv (1000 rows) + 45 evidence files (jpg, pdf, png)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="110" y="110" width="1180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 2: CREATE FILE JOB -->
+        <mxCell id="step2-box" value="STEP 2: CREATE FILE_JOB TRACKING RECORD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="200" width="1200" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="step2-detail" value="File Processor creates file_job record to track overall file processing&#xa;&#xa;TABLE INSERT: file_job&#xa;&#xa;{id: file-job-123, file_name: chargeback_20250115.zip, source_network: VISA,&#xa; total_rows: 1000, evidence_count: 45, status: PROCESSING, created_at: 2025-01-15 10:30:00}&#xa;&#xa;This record tracks the entire file processing lifecycle" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="230" width="1180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 3: EXTRACT AND UPLOAD EVIDENCE -->
+        <mxCell id="step3-box" value="STEP 3: EXTRACT ZIP AND UPLOAD EVIDENCE TO S3 STAGING" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="360" width="1200" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="step3-detail" value="File Processor extracts ZIP and uploads all evidence files to S3 staging&#xa;&#xa;Extract: chargeback.csv + 45 evidence files&#xa;Upload to: S3 /evidence-staging/file-job-123/&#xa;  - image001.jpg, image002.pdf, receipt.png, ... (45 files total)&#xa;&#xa;All evidence files now in S3 staging, ready to be linked to cases" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="390" width="1180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 4: CREATE EVIDENCE MANIFEST -->
+        <mxCell id="step4-box" value="STEP 4: CREATE EVIDENCE MANIFEST IN FILE_JOB_ARTIFACT TABLE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="520" width="1200" height="240" as="geometry"/>
+        </mxCell>
+        <mxCell id="step4-detail" value="File Processor parses CSV and creates manifest linking evidence to CSV rows&#xa;&#xa;TABLE INSERT: file_job_artifact (45 records - one per evidence file)&#xa;&#xa;+----------+---------------+------------+----------------------+-------------------------------------------+&#xa;| id       | file_job_id   | row_number | original_filename    | s3_uri                                    |&#xa;+----------+---------------+------------+----------------------+-------------------------------------------+&#xa;| uuid-1   | file-job-123  | 1          | image001.jpg         | s3://.../file-job-123/image001.jpg        |&#xa;| uuid-2   | file-job-123  | 1          | image002.pdf         | s3://.../file-job-123/image002.pdf        |&#xa;| uuid-3   | file-job-123  | 5          | receipt.png          | s3://.../file-job-123/receipt.png         |&#xa;| ...      | ...           | ...        | ...                  | ...                                       |&#xa;| uuid-45  | file-job-123  | 998        | dispute_proof.jpg    | s3://.../file-job-123/dispute_proof.jpg   |&#xa;+----------+---------------+------------+----------------------+-------------------------------------------+&#xa;&#xa;Manifest complete - evidence mapped to CSV rows" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=9;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="550" width="1180" height="200" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 5: CREATE FILE JOB ROW RECORDS -->
+        <mxCell id="step5-box" value="STEP 5: CREATE FILE_JOB_ROW RECORDS FOR ALL CSV ROWS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="780" width="1200" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="step5-detail" value="File Processor creates one file_job_row record per CSV row for tracking&#xa;&#xa;TABLE INSERT: file_job_row (1000 records)&#xa;&#xa;+----------+---------------+------------+---------+-----------+&#xa;| id       | file_job_id   | row_number | case_id | status    |&#xa;+----------+---------------+------------+---------+-----------+&#xa;| row-1    | file-job-123  | 1          | NULL    | PENDING   |&#xa;| row-2    | file-job-123  | 2          | NULL    | PENDING   |&#xa;| ...      | ...           | ...        | NULL    | PENDING   |&#xa;| row-1000 | file-job-123  | 1000       | NULL    | PENDING   |&#xa;+----------+---------------+------------+---------+-----------+&#xa;&#xa;All rows ready for processing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=9;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="810" width="1180" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 6: INSERT OUTBOX -->
+        <mxCell id="step6-box" value="STEP 6: INSERT TO OUTBOX WITH EVIDENCE METADATA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8bbd0;strokeColor=#c2185b;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="980" width="1200" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="step6-detail" value="For each CSV row, insert outbox event with evidence flags and update file_job_row&#xa;&#xa;TABLE INSERT: outbox (1000 records with hasEvidence flag)&#xa;TABLE UPDATE: file_job_row SET status = OUTBOXED&#xa;&#xa;Example for Row 1 (has 2 evidence files):&#xa;Outbox payload: {caseId, HPAN, amount, hasEvidence: true, evidenceCount: 2,&#xa;                 fileJobId: file-job-123, rowNumber: 1}&#xa;&#xa;Example for Row 50 (no evidence):&#xa;Outbox payload: {caseId, HPAN, amount, hasEvidence: false, fileJobId: file-job-123, rowNumber: 50}&#xa;&#xa;hasEvidence flag determines if Evidence Attach Worker processes the case" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1010" width="1180" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 7: PUBLISH TO KAFKA -->
+        <mxCell id="step7-box" value="STEP 7: PUBLISH SCHEDULER PUBLISHES ALL EVENTS TO KAFKA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b2dfdb;strokeColor=#00695c;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1180" width="1200" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="step7-detail" value="Publish Scheduler reads outbox and publishes all 1000 events to Kafka&#xa;&#xa;TABLE READ: outbox WHERE status = PENDING&#xa;KAFKA PUBLISH: chargeback.new.events and chargeback.update.events&#xa;TABLE UPDATE: outbox SET status = PUBLISHED&#xa;&#xa;All events in Kafka with evidence metadata (hasEvidence, fileJobId, rowNumber)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1210" width="1180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 8: CASE CREATION -->
+        <mxCell id="step8-box" value="STEP 8: CASE CONSUMERS CREATE CASES FOR ALL ROWS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1320" width="1200" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="step8-detail" value="New Case Consumer and Update Case Consumer create cases for all 1000 rows&#xa;&#xa;TABLE INSERT: case (1000 records in DRAFT status)&#xa;TABLE INSERT: case_action (1000 action records)&#xa;&#xa;Example: INSERT INTO case (id: case-001, case_number: CB-001, status: DRAFT, ...)&#xa;         INSERT INTO case_action (id: action-001, case_id: case-001, status: DRAFT, ...)&#xa;&#xa;All 1000 cases created, ready for evidence attachment" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1350" width="1180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 9: EMIT EVENTS -->
+        <mxCell id="step9-box" value="STEP 9: EMIT CASEDRAFTCREATED AND EVIDENCEATTACHREQUESTED EVENTS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffccbc;strokeColor=#bf360c;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1480" width="1200" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="step9-detail" value="Case Consumers emit events for case creation and evidence attachment&#xa;&#xa;KAFKA TOPIC: case.lifecycle.events&#xa;EVENT 1: CaseDraftCreated (all 1000 cases)&#xa;  - Triggers File Job Orchestrator to track progress&#xa;  - Example: {event: CaseDraftCreated, caseId: case-001, fileJobId: file-job-123, rowNumber: 1}&#xa;&#xa;KAFKA TOPIC: evidence.requests&#xa;EVENT 2: EvidenceAttachRequested (ONLY for cases with hasEvidence=true)&#xa;  - Triggers Evidence Attach Worker&#xa;  - Example: {event: EvidenceAttachRequested, caseId: case-001, actionId: action-001,&#xa;             fileJobId: file-job-123, rowNumber: 1}" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1510" width="1180" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 10: EVIDENCE WORKER PROCESSES -->
+        <mxCell id="step10-box" value="STEP 10: EVIDENCE ATTACH WORKER QUERIES MANIFEST AND ATTACHES EVIDENCE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1660" width="1200" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="step10-detail" value="Evidence Attach Worker processes EvidenceAttachRequested events (for cases with evidence)&#xa;&#xa;KAFKA SUBSCRIBE: evidence.requests&#xa;&#xa;For each event (e.g., case-001 with rowNumber=1):&#xa;1. TABLE QUERY: file_job_artifact WHERE file_job_id = file-job-123 AND row_number = 1&#xa;   Result: 2 evidence files (uuid-1: image001.jpg, uuid-2: image002.pdf)&#xa;&#xa;2. S3 VALIDATION: Verify files exist in s3://.../file-job-123/image001.jpg, image002.pdf&#xa;&#xa;3. TABLE INSERT: case_evidence (2 link records)&#xa;   {id: link-1, case_id: case-001, artifact_id: uuid-1, s3_uri, status: ATTACHED}&#xa;   {id: link-2, case_id: case-001, artifact_id: uuid-2, s3_uri, status: ATTACHED}&#xa;&#xa;Evidence successfully attached to case" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1690" width="1180" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 11: FILE JOB ORCHESTRATOR MONITORS -->
+        <mxCell id="step11-box" value="STEP 11: FILE JOB ORCHESTRATOR MONITORS CASEDRAFTCREATED EVENTS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1880" width="1200" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="step11-detail" value="File Job Orchestrator subscribes to case.lifecycle.events and tracks progress&#xa;&#xa;KAFKA SUBSCRIBE: case.lifecycle.events (filter: CaseDraftCreated with fileJobId)&#xa;&#xa;For each CaseDraftCreated event:&#xa;  - Extract: fileJobId, rowNumber, caseId&#xa;  - Match to file_job_row record&#xa;  - Update row status to track progress&#xa;&#xa;Processes all 1000 CaseDraftCreated events" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="1910" width="1180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 12: UPDATE ROW STATUS -->
+        <mxCell id="step12-box" value="STEP 12: UPDATE FILE_JOB_ROW STATUS TO INGESTED_OK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="2040" width="1200" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="step12-detail" value="File Job Orchestrator updates file_job_row status for each successful case creation&#xa;&#xa;TABLE UPDATE: file_job_row (1000 updates)&#xa;&#xa;For each row:&#xa;  UPDATE file_job_row&#xa;  SET status = INGESTED_OK, case_id = case-XXX, updated_at = NOW()&#xa;  WHERE file_job_id = file-job-123 AND row_number = N&#xa;&#xa;Status progression: PENDING -> OUTBOXED -> INGESTED_OK&#xa;&#xa;Note: Evidence attachment happens in parallel (Step 10) but does NOT block row status updates" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="2070" width="1180" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 13: CHECK COMPLETION -->
+        <mxCell id="step13-box" value="STEP 13: CHECK IF ALL ROWS COMPLETED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a5d6a7;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="2240" width="1200" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="step13-detail" value="File Job Orchestrator checks if ALL rows reached terminal state&#xa;&#xa;TABLE QUERY: file_job_row&#xa;&#xa;SELECT COUNT(*) FROM file_job_row&#xa;WHERE file_job_id = file-job-123&#xa;  AND status IN (INGESTED_OK, FAILED);&#xa;&#xa;Expected: 1000 (matches total_rows from file_job)&#xa;Actual: 1000&#xa;&#xa;Result: ALL ROWS COMPLETE -> Ready for ACK generation&#xa;&#xa;Note: ACK generation does NOT wait for evidence attachment to complete" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="2270" width="1180" height="140" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 14: GENERATE ACK -->
+        <mxCell id="step14-box" value="STEP 14: GENERATE ACK FILE WITH ROW STATUS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="2440" width="1200" height="240" as="geometry"/>
+        </mxCell>
+        <mxCell id="step14-detail" value="File Job Orchestrator generates ACK file with success/failure status for each row&#xa;&#xa;ACK FILE: chargeback_20250115_ACK.csv&#xa;&#xa;row_number,case_number,status,error_message&#xa;1,CB-001,SUCCESS,&#xa;2,CB-002,SUCCESS,&#xa;3,CB-003,SUCCESS,&#xa;...&#xa;1000,CB-1000,SUCCESS,&#xa;&#xa;QUERY TO GENERATE ACK:&#xa;SELECT fjr.row_number, c.case_number,&#xa;       CASE WHEN fjr.status = INGESTED_OK THEN SUCCESS ELSE FAILED END,&#xa;       fjr.error_message&#xa;FROM file_job_row fjr LEFT JOIN case c ON fjr.case_id = c.id&#xa;WHERE fjr.file_job_id = file-job-123&#xa;ORDER BY fjr.row_number;&#xa;&#xa;ACK file generated with all 1000 rows" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=9;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="2470" width="1180" height="200" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 15: UPLOAD ACK -->
+        <mxCell id="step15-box" value="STEP 15: UPLOAD ACK FILE TO S3 /ack/ FOLDER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#ef6c00;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="2700" width="1200" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="step15-detail" value="File Job Orchestrator uploads ACK file to S3 for network to download&#xa;&#xa;S3 UPLOAD: s3://wdp-disputes/ack/chargeback_20250115_ACK.csv&#xa;&#xa;ACK file available for network to confirm receipt of all 1000 rows&#xa;&#xa;Network downloads ACK to verify processing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="2730" width="1180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 16: MOVE ZIP -->
+        <mxCell id="step16-box" value="STEP 16: MOVE ZIP FILE TO /processed/ FOLDER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="2840" width="1200" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="step16-detail" value="File Job Orchestrator moves original ZIP file to processed folder for archival&#xa;&#xa;S3 COPY: /inbound/chargeback_20250115.zip -> /processed/chargeback_20250115.zip&#xa;S3 DELETE: /inbound/chargeback_20250115.zip&#xa;&#xa;Original file archived, /inbound/ folder cleaned up" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="2870" width="1180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- STEP 17: UPDATE FILE JOB -->
+        <mxCell id="step17-box" value="STEP 17: UPDATE FILE_JOB STATUS TO COMPLETED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8bbd0;strokeColor=#c2185b;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="2980" width="1200" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="step17-detail" value="File Job Orchestrator marks file_job as COMPLETED&#xa;&#xa;TABLE UPDATE: file_job&#xa;&#xa;UPDATE file_job&#xa;SET status = COMPLETED, completed_at = 2025-01-15 10:45:00&#xa;WHERE id = file-job-123;&#xa;&#xa;COMPLETE! File processed, cases created, evidence attached, ACK sent, ZIP archived" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="3010" width="1180" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- SUMMARY BOX -->
+        <mxCell id="summary-box" value="PARALLEL PROCESSING SUMMARY" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="100" y="3160" width="1200" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="summary-detail" value="Key Points About This Flow:&#xa;&#xa;1. EVIDENCE ATTACHMENT (Step 10) runs in PARALLEL with File Job Orchestrator (Steps 11-12)&#xa;   - Evidence Worker processes evidence.requests events asynchronously&#xa;   - File Job Orchestrator tracks case creation via case.lifecycle.events&#xa;   - These are INDEPENDENT processes&#xa;&#xa;2. ACK GENERATION (Steps 13-17) happens AFTER all cases created (Step 12 complete)&#xa;   - ACK does NOT wait for evidence attachment to finish&#xa;   - ACK confirms: Cases created successfully (INGESTED_OK)&#xa;   - Evidence attachment continues in background after ACK sent&#xa;&#xa;3. FLOW TIMING:&#xa;   - Evidence attachment: 1-5 minutes (depending on file count and S3 performance)&#xa;   - ACK generation: Triggered when all 1000 rows reach INGESTED_OK status&#xa;   - Total flow time: ~10-15 minutes for 1000 rows with evidence" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="3190" width="1180" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- TABLE REFERENCE -->
+        <mxCell id="tables-box" value="DATABASE TABLES INVOLVED" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="100" y="3400" width="1200" height="1300" as="geometry"/>
+        </mxCell>
+        <mxCell id="tables-detail" value="1. file_job - FILE TRACKING TABLE (Step 2, Step 17)&#xa;   Tracks overall file processing status (PROCESSING -> COMPLETED)&#xa;&#xa;2. file_job_artifact - EVIDENCE MANIFEST TABLE (Step 4, Step 10)&#xa;   Maps evidence files to CSV rows. Created during extraction, queried by Evidence Worker.&#xa;&#xa;3. file_job_row - ROW TRACKING TABLE (Step 5, Step 12)&#xa;   Tracks each CSV row status (PENDING -> OUTBOXED -> INGESTED_OK)&#xa;&#xa;4. outbox - EVENT PUBLICATION TABLE (Step 6)&#xa;   Stores events for Kafka. Contains hasEvidence flag, fileJobId, rowNumber.&#xa;&#xa;5. case - CASE TABLE (Step 8)&#xa;   Stores case information. Created by Case Consumers.&#xa;&#xa;6. case_action - ACTION TABLE (Step 8)&#xa;   Stores case actions. Created by Case Consumers.&#xa;&#xa;7. case_evidence - EVIDENCE LINK TABLE (Step 10)&#xa;   Links evidence files to cases. Created by Evidence Attach Worker.&#xa;&#xa;---&#xa;&#xa;COMPLETE DDL FOR KEY TABLES:&#xa;&#xa;CREATE TABLE file_job (&#xa;    id UUID PRIMARY KEY, file_name VARCHAR(255), source_network VARCHAR(50),&#xa;    total_rows INTEGER, evidence_count INTEGER, status VARCHAR(50) DEFAULT PROCESSING,&#xa;    created_at TIMESTAMP, completed_at TIMESTAMP,&#xa;    UNIQUE (file_name, source_network)&#xa;);&#xa;&#xa;CREATE TABLE file_job_artifact (&#xa;    id UUID PRIMARY KEY, file_job_id UUID, row_number INTEGER,&#xa;    original_filename VARCHAR(255), s3_uri VARCHAR(1024),&#xa;    file_size BIGINT, content_type VARCHAR(100), created_at TIMESTAMP,&#xa;    FOREIGN KEY (file_job_id) REFERENCES file_job(id)&#xa;);&#xa;CREATE INDEX idx_artifact_job_row ON file_job_artifact(file_job_id, row_number);&#xa;&#xa;CREATE TABLE file_job_row (&#xa;    id UUID PRIMARY KEY, file_job_id UUID, row_number INTEGER,&#xa;    case_id UUID, status VARCHAR(50) DEFAULT PENDING,&#xa;    error_message TEXT, created_at TIMESTAMP, updated_at TIMESTAMP,&#xa;    FOREIGN KEY (file_job_id) REFERENCES file_job(id),&#xa;    FOREIGN KEY (case_id) REFERENCES case(id)&#xa;);&#xa;CREATE INDEX idx_row_job_status ON file_job_row(file_job_id, status);&#xa;&#xa;CREATE TABLE case_evidence (&#xa;    id UUID PRIMARY KEY, case_id UUID, action_id UUID, artifact_id UUID,&#xa;    s3_uri VARCHAR(1024), original_filename VARCHAR(255),&#xa;    file_size BIGINT, content_type VARCHAR(100), status VARCHAR(50) DEFAULT ATTACHED,&#xa;    created_at TIMESTAMP,&#xa;    FOREIGN KEY (case_id) REFERENCES case(id),&#xa;    FOREIGN KEY (artifact_id) REFERENCES file_job_artifact(id)&#xa;);&#xa;&#xa;---&#xa;&#xa;KEY QUERIES:&#xa;&#xa;Check completion:&#xa;SELECT COUNT(*) FROM file_job_row WHERE file_job_id = ? AND status IN (INGESTED_OK, FAILED);&#xa;&#xa;Generate ACK data:&#xa;SELECT fjr.row_number, c.case_number,&#xa;       CASE WHEN fjr.status = INGESTED_OK THEN SUCCESS ELSE FAILED END,&#xa;       fjr.error_message&#xa;FROM file_job_row fjr LEFT JOIN case c ON fjr.case_id = c.id&#xa;WHERE fjr.file_job_id = ? ORDER BY fjr.row_number;&#xa;&#xa;Query evidence manifest:&#xa;SELECT * FROM file_job_artifact WHERE file_job_id = ? AND row_number = ?;&#xa;&#xa;Get evidence for case:&#xa;SELECT ce.*, fja.original_filename, fja.s3_uri&#xa;FROM case_evidence ce JOIN file_job_artifact fja ON ce.artifact_id = fja.id&#xa;WHERE ce.case_id = ?;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=8;spacingLeft=10;fontFamily=Courier New;" vertex="1" parent="1">
+          <mxGeometry x="110" y="3430" width="1180" height="1260" as="geometry"/>
+        </mxCell>
+
+        <!-- ARROWS -->
+        <mxCell id="arr1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#ef6c00;entryX=0.5;entryY=0;" edge="1" parent="1" source="step1-box" target="step2-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;entryX=0.5;entryY=0;" edge="1" parent="1" source="step2-box" target="step3-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#e65100;entryX=0.5;entryY=0;" edge="1" parent="1" source="step3-box" target="step4-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" edge="1" parent="1" source="step4-box" target="step5-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#6a1b9a;entryX=0.5;entryY=0;" edge="1" parent="1" source="step5-box" target="step6-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#c2185b;entryX=0.5;entryY=0;" edge="1" parent="1" source="step6-box" target="step7-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#00695c;entryX=0.5;entryY=0;" edge="1" parent="1" source="step7-box" target="step8-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57f17;entryX=0.5;entryY=0;" edge="1" parent="1" source="step8-box" target="step9-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#bf360c;entryX=0.5;entryY=0;" edge="1" parent="1" source="step9-box" target="step10-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#7b1fa2;entryX=0.5;entryY=0;" edge="1" parent="1" source="step9-box" target="step11-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" edge="1" parent="1" source="step11-box" target="step12-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;entryX=0.5;entryY=0;" edge="1" parent="1" source="step12-box" target="step13-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" edge="1" parent="1" source="step13-box" target="step14-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;entryX=0.5;entryY=0;" edge="1" parent="1" source="step14-box" target="step15-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#ef6c00;entryX=0.5;entryY=0;" edge="1" parent="1" source="step15-box" target="step16-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arr16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" edge="1" parent="1" source="step16-box" target="step17-box">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
