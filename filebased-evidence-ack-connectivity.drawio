@@ -1,0 +1,358 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2025-01-15T12:00:00.000Z" agent="Claude" version="24.0.0">
+  <diagram id="complete-flow-architecture" name="Complete Flow - Evidence + ACK">
+    <mxGraphModel dx="2400" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1600">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- TITLE -->
+        <mxCell id="title" value="COMPLETE FILE PROCESSING ARCHITECTURE - EVIDENCE ATTACHMENT + ACK GENERATION" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=24;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="100" y="20" width="1600" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- LEGEND -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="80" width="800" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend-text" value="Legend:   🟧 PCI Scoped   🟦 Event Bus   🟩 Consumers   🟪 Database   🟨 ACK Flow   ➡️ Sync   ⤍ Async   ⚡ Parallel" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="120" y="90" width="760" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- LAYER 1: S3 BUCKETS -->
+        <mxCell id="s3-container" value="AWS S3 BUCKETS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e6;strokeColor=#f57c00;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="150" width="280" height="260" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="s3-inbound" value="📁 /inbound/&#xa;ZIP files arrive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#f57c00;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="120" y="190" width="240" height="40" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="s3-staging" value="📁 /evidence-staging/&#xa;Extracted evidence files" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#f57c00;fontSize=11;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="240" width="240" height="40" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="s3-ack" value="📁 /ack/&#xa;ACK files for networks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=11;align=center;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="120" y="290" width="240" height="40" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="s3-processed" value="📁 /processed/&#xa;Completed ZIPs (archived)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#f57c00;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="120" y="340" width="240" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- SQS QUEUE -->
+        <mxCell id="sqs" value="AWS SQS QUEUE&#xa;&#xa;wdp-file-arrivals&#xa;&#xa;Visibility: 30 min&#xa;Batch: 1000 rows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=12;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="420" y="190" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- FILE PROCESSOR (PCI SCOPED) -->
+        <mxCell id="fp-container" value="FILE PROCESSOR (PCI-SCOPED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#c62828;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=3;dashed=1;dashPattern=8 8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="450" width="520" height="380" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp-steps" value="Steps 1-6: File Processing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontStyle=1;fontColor=#c62828;" vertex="1" parent="1">
+          <mxGeometry x="120" y="480" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp1" value="1️⃣ Create file_job record" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="120" y="510" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp2" value="2️⃣ Stream ZIP + Extract images" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="120" y="550" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp3" value="3️⃣ Upload to S3 /evidence-staging/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="120" y="590" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp4" value="4️⃣ Build file_job_artifact manifest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="630" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp5" value="5️⃣ Create file_job_row records (1000 rows)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="120" y="670" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp6" value="6️⃣ Insert outbox (hasEvidence, fileJobId, rowNumber)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="710" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp-note" value="UPDATE file_job_row: PENDING → OUTBOXED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=9;align=center;" vertex="1" parent="1">
+          <mxGeometry x="120" y="750" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp-metadata" value="Outbox Metadata: hasEvidence, evidenceCount, fileJobId, rowNumber" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0288d1;fontSize=9;align=center;" vertex="1" parent="1">
+          <mxGeometry x="120" y="790" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- DATABASE LAYER -->
+        <mxCell id="db-container" value="AURORA DATABASE (POSTGRES)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#7b1fa2;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="660" y="150" width="500" height="680" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-outbox" value="📊 outbox&#xa;Event publication queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="680" y="190" width="460" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-filejob" value="📊 file_job (Step 1, Step 17)&#xa;Overall file tracking: PROCESSING → COMPLETED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=10;align=center;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="680" y="240" width="460" height="45" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-filejobrow" value="📊 file_job_row (Step 5, Steps 11-13) ⚡&#xa;Row status: PENDING → OUTBOXED → INGESTED_OK&#xa;Critical for ACK generation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=10;align=center;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="680" y="295" width="460" height="55" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-manifest" value="📋 file_job_artifact (Step 4, Step 10)&#xa;EVIDENCE MANIFEST - Links files to CSV rows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=10;align=center;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="680" y="360" width="460" height="45" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-case" value="📊 case (Step 8)&#xa;Case records (DRAFT/OPEN)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=10;align=center;" vertex="1" parent="1">
+          <mxGeometry x="680" y="415" width="220" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-action" value="📊 case_action (Step 8)&#xa;Actions (CH1, CH2, ARB)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=10;align=center;" vertex="1" parent="1">
+          <mxGeometry x="920" y="415" width="220" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-evidence" value="🔗 case_evidence (Step 10)&#xa;LINK TABLE - case → evidence files" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=10;align=center;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="680" y="465" width="460" height="45" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-flow-note" value="🔄 FILE_JOB_ROW STATUS FLOW:&#xa;PENDING (initial) → OUTBOXED (after outbox insert)&#xa;→ INGESTED_OK (after CaseDraftCreated)&#xa;&#xa;ACK Generation Query:&#xa;SELECT COUNT(*) FROM file_job_row&#xa;WHERE file_job_id = ? AND status IN (INGESTED_OK, FAILED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=9;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="680" y="520" width="460" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-chain" value="🔍 Chain of Custody:&#xa;file_job → file_job_artifact → case_evidence → case&#xa;&#xa;🔍 ACK Data Query:&#xa;SELECT fjr.row_number, c.case_number, fjr.status, fjr.error_message&#xa;FROM file_job_row fjr LEFT JOIN case c ON fjr.case_id = c.id&#xa;WHERE fjr.file_job_id = ? ORDER BY fjr.row_number" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=9;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="680" y="630" width="460" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-indexes" value="📑 Critical Indexes:&#xa;• idx_artifact_job_row (file_job_id, row_number)&#xa;• idx_row_job_status (file_job_id, status) ⚡&#xa;• idx_evidence_case_id, idx_evidence_artifact_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=9;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="680" y="740" width="460" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- PUBLISH SCHEDULER -->
+        <mxCell id="scheduler" value="PUBLISH SCHEDULER&#xa;(Step 7)&#xa;&#xa;Poll outbox&#xa;Publish to Kafka&#xa;&#xa;Interval: 5s | Batch: 100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#f57c00;fontSize=11;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="780" y="870" width="180" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- KAFKA TOPICS -->
+        <mxCell id="kafka-container" value="KAFKA TOPICS (AWS MSK)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="870" width="620" height="260" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka-steps" value="Step 7: Publish | Steps 8-9: Consume" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontStyle=1;fontColor=#1565c0;" vertex="1" parent="1">
+          <mxGeometry x="120" y="900" width="250" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka1" value="📢 chargeback.new.events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="930" width="580" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka2" value="📢 chargeback.update.events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="970" width="580" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka3" value="📢 case.lifecycle.events (CaseDraftCreated) ⚡" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#0d47a1;fontSize=11;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1010" width="580" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka4" value="📢 evidence.requests (EvidenceAttachRequested)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#0d47a1;fontSize=11;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1050" width="580" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka5" value="📢 evidence.lifecycle.events (EvidenceAttached)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="1090" width="580" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- CONSUMERS & WORKERS -->
+        <mxCell id="consumers-container" value="DOMAIN CONSUMERS &amp; WORKERS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="1030" width="920" height="570" as="geometry"/>
+        </mxCell>
+
+        <!-- New/Update Case Consumers -->
+        <mxCell id="consumer-row" value="Steps 8-9: Case Creation + Event Emission" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontStyle=1;fontColor=#2e7d32;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1060" width="300" height="20" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="consumer1" value="NEW CASE CONSUMER&#xa;&#xa;Subscribe: chargeback.new.events&#xa;&#xa;• INSERT case (DRAFT)&#xa;• INSERT action (OPEN)&#xa;• Emit CaseDraftCreated&#xa;• Emit evidence.requests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1090" width="240" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="consumer2" value="UPDATE CASE CONSUMER&#xa;&#xa;Subscribe: chargeback.update.events&#xa;&#xa;• Find existing case&#xa;• INSERT action (new stage)&#xa;• Emit CaseDraftCreated&#xa;• Emit evidence.requests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="1090" width="240" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- PARALLEL PROCESSING ROW -->
+        <mxCell id="parallel-label" value="⚡ PARALLEL PROCESSING (Steps 10-12)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#d32f2f;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1230" width="880" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Evidence Attach Worker -->
+        <mxCell id="evidence-worker" value="EVIDENCE ATTACH WORKER (Step 10) ⚡&#xa;&#xa;Subscribe: evidence.requests&#xa;&#xa;Process (ASYNC):&#xa;1️⃣ Query file_job_artifact (manifest)&#xa;2️⃣ Validate S3 files exist (HEAD)&#xa;3️⃣ INSERT case_evidence links&#xa;4️⃣ Emit EvidenceAttached&#xa;&#xa;Runs INDEPENDENTLY&#xa;Does NOT block ACK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a5d6a7;strokeColor=#1b5e20;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1270" width="280" height="180" as="geometry"/>
+        </mxCell>
+
+        <!-- File Job Orchestrator -->
+        <mxCell id="orchestrator" value="FILE JOB ORCHESTRATOR ⭐&#xa;(Steps 11-17: ACK FLOW)&#xa;&#xa;Subscribe: case.lifecycle.events&#xa;&#xa;Process:&#xa;1️⃣1️⃣ Monitor CaseDraftCreated&#xa;1️⃣2️⃣ UPDATE file_job_row → INGESTED_OK&#xa;1️⃣3️⃣ Check all rows completed&#xa;1️⃣4️⃣ Generate ACK file&#xa;1️⃣5️⃣ Upload ACK to S3 /ack/&#xa;1️⃣6️⃣ Move ZIP to /processed/&#xa;1️⃣7️⃣ UPDATE file_job → COMPLETED&#xa;&#xa;CRITICAL for ACK generation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="1270" width="280" height="230" as="geometry"/>
+        </mxCell>
+
+        <!-- ACK GENERATION FLOW -->
+        <mxCell id="ack-flow-box" value="ACK GENERATION SEQUENCE (Steps 13-17)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=12;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1400" y="1270" width="280" height="230" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ack-steps" value="When ALL rows INGESTED_OK:&#xa;&#xa;1️⃣3️⃣ Query completion status&#xa;   COUNT(INGESTED_OK) = total_rows&#xa;&#xa;1️⃣4️⃣ Generate ACK CSV&#xa;   row_number, case_number, status&#xa;&#xa;1️⃣5️⃣ Upload to S3 /ack/&#xa;   chargeback_20250115_ACK.csv&#xa;&#xa;1️⃣6️⃣ Archive ZIP to /processed/&#xa;&#xa;1️⃣7️⃣ Mark file_job COMPLETED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#f57f17;fontSize=9;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="1310" width="240" height="180" as="geometry"/>
+        </mxCell>
+
+        <!-- Other Consumers -->
+        <mxCell id="bre" value="BUSINESS RULES ENGINE&#xa;&#xa;Subscribe: case.lifecycle.events&#xa;&#xa;• Validate DRAFT cases&#xa;• DRAFT → OPEN transition&#xa;• Emit CaseOpened&#xa;&#xa;File-agnostic domain logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1470" width="240" height="110" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="enrichment" value="ENRICHMENT SERVICE&#xa;&#xa;Subscribe: case.lifecycle.events&#xa;&#xa;• Call Acquirer Lookup API&#xa;• UPDATE case metadata&#xa;• Emit CaseEnriched&#xa;&#xa;Async - off hot path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="1470" width="240" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- KEY TIMING NOTE -->
+        <mxCell id="timing-note" value="⏱️ TIMING CRITICAL:&#xa;&#xa;ACK Generated AFTER:&#xa;✅ All cases created (INGESTED_OK)&#xa;&#xa;ACK Does NOT Wait For:&#xa;❌ Evidence attachment (runs parallel)&#xa;❌ Business rules validation&#xa;❌ Enrichment completion" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#c62828;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="1470" width="360" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- FLOW ARROWS -->
+        <!-- S3 to SQS -->
+        <mxCell id="arrow1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57c00;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="s3-inbound" target="sqs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow1-label" value="S3 Event" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="190" width="60" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- SQS to File Processor -->
+        <mxCell id="arrow2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#c62828;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="sqs" target="fp-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow2-label" value="Poll" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#c62828;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="380" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- File Processor to S3 Staging -->
+        <mxCell id="arrow3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#f57c00;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="fp3" target="s3-staging">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow3-label" value="Upload" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="580" width="50" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- File Processor to Database -->
+        <mxCell id="arrow4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#7b1fa2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="fp6" target="db-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow4-label" value="Write" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#7b1fa2;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="630" y="700" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Database to Scheduler -->
+        <mxCell id="arrow5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57c00;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="db-outbox" target="scheduler">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow5-label" value="Poll" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="880" y="840" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Scheduler to Kafka -->
+        <mxCell id="arrow6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="scheduler" target="kafka-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow6-label" value="Publish" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#1565c0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="730" y="910" width="50" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Kafka to Consumers -->
+        <mxCell id="arrow7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" parent="1" source="kafka1" target="consumers-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Kafka to Evidence Worker (Parallel) -->
+        <mxCell id="arrow8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1b5e20;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="kafka4" target="evidence-worker">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow8-label" value="Async ⚡" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#1b5e20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="730" y="1300" width="60" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Kafka to Orchestrator (Parallel) -->
+        <mxCell id="arrow9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57f17;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="kafka3" target="orchestrator">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow9-label" value="Track ⚡" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57f17;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="730" y="1350" width="60" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Evidence Worker to Database -->
+        <mxCell id="arrow10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#7b1fa2;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="evidence-worker" target="db-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow10-label" value="Query + Write" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=9;fontColor=#7b1fa2;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1200" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Orchestrator to Database -->
+        <mxCell id="arrow11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57f17;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="orchestrator" target="db-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow11-label" value="Update Status" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=9;fontColor=#f57f17;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1170" y="1200" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Orchestrator to S3 ACK -->
+        <mxCell id="arrow12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57f17;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="orchestrator" target="s3-ack">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="1443"/>
+              <mxPoint x="1000" y="1560"/>
+              <mxPoint x="50" y="1560"/>
+              <mxPoint x="50" y="310"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow12-label" value="Upload ACK" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=9;fontColor=#f57f17;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="810" width="70" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Orchestrator to S3 Processed -->
+        <mxCell id="arrow13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#f57c00;exitX=0;exitY=0.9;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="orchestrator" target="s3-processed">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="980" y="1477"/>
+              <mxPoint x="980" y="1580"/>
+              <mxPoint x="30" y="1580"/>
+              <mxPoint x="30" y="360"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow13-label" value="Archive ZIP" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=9;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="900" width="70" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Evidence Worker to S3 -->
+        <mxCell id="arrow14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#f57c00;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="evidence-worker" target="s3-staging">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="750" y="1360"/>
+              <mxPoint x="750" y="1550"/>
+              <mxPoint x="10" y="1550"/>
+              <mxPoint x="10" y="260"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow14-label" value="Fetch Files" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=9;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="10" y="700" width="70" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2025-01-15T12:00:00.000Z" agent="Claude" version="24.0.0">
+  <diagram id="evidence-architecture" name="Evidence Attachment Architecture">
+    <mxGraphModel dx="2200" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1400">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        
+        <!-- TITLE -->
+        <mxCell id="title" value="EVIDENCE ATTACHMENT ARCHITECTURE - FILE-BASED FLOW (NO ACK)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=24;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="100" y="20" width="1400" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- LEGEND -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="100" y="80" width="600" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend-text" value="Legend:   🟧 PCI Scoped   🟦 Event Bus   🟩 Consumers   🟪 Database   ➡️ Sync Flow   ⤍ Async Flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;fontSize=11;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="120" y="90" width="560" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- LAYER 1: S3 BUCKETS -->
+        <mxCell id="s3-container" value="AWS S3 BUCKETS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e6;strokeColor=#f57c00;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="150" width="280" height="200" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="s3-inbound" value="📁 /inbound/&#xa;(ZIP files arrive here)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#f57c00;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="120" y="190" width="240" height="40" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="s3-staging" value="📁 /evidence-staging/&#xa;(Extracted evidence files)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#f57c00;fontSize=11;align=center;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="240" width="240" height="40" as="geometry"/>
+        </mxCell>
+        
+        <mxCell id="s3-processed" value="📁 /processed/&#xa;(Completed ZIPs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#f57c00;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="120" y="290" width="240" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- SQS QUEUE -->
+        <mxCell id="sqs" value="AWS SQS QUEUE&#xa;&#xa;wdp-file-arrivals&#xa;&#xa;Visibility Timeout: 30 min&#xa;Batch Size: 1000 rows" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=12;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="420" y="180" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- FILE PROCESSOR (PCI SCOPED) -->
+        <mxCell id="fp-container" value="FILE PROCESSOR (PCI-SCOPED)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#c62828;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=3;dashed=1;dashPattern=8 8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="380" width="520" height="320" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp1" value="1️⃣ Stream ZIP + Extract Images" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="420" width="480" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp2" value="2️⃣ Upload Evidence to S3 /evidence-staging/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="465" width="480" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp3" value="3️⃣ Parse CSV + Build file_job_artifact Manifest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="510" width="480" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp4" value="4️⃣ Case Existence Check" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="555" width="230" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp5" value="5️⃣ Encrypt PAN (NEW)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="370" y="555" width="230" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp6" value="6️⃣ Insert Outbox + file_job_row (Single Transaction)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="600" width="480" height="35" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fp-note" value="hasEvidence: true&#xa;evidenceCount: N&#xa;fileJobId: xxx&#xa;rowNumber: N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=9;align=left;spacingLeft=5;" vertex="1" parent="1">
+          <mxGeometry x="120" y="645" width="480" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- DATABASE LAYER -->
+        <mxCell id="db-container" value="AURORA DATABASE (POSTGRES)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#7b1fa2;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="660" y="150" width="420" height="550" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-outbox" value="📊 outbox&#xa;Event publication queue" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="680" y="190" width="380" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-filejob" value="📊 file_job&#xa;Job tracking (one per ZIP)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="680" y="240" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-filejobrow" value="📊 file_job_row&#xa;Row-level status tracking" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="880" y="240" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-manifest" value="📋 file_job_artifact&#xa;EVIDENCE MANIFEST&#xa;(Links files to CSV rows)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=11;align=center;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="680" y="290" width="380" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-case" value="📊 case&#xa;Case records (DRAFT/OPEN)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="680" y="350" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-action" value="📊 case_action&#xa;Actions (CH1, CH2, ARB)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="880" y="350" width="180" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-evidence" value="🔗 case_evidence&#xa;LINK TABLE&#xa;(case → evidence files)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=11;align=center;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="680" y="400" width="380" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-note" value="CRITICAL TABLES FOR EVIDENCE:&#xa;• file_job_artifact: Manifest of all evidence files uploaded to S3&#xa;• case_evidence: Links evidence to specific cases/actions&#xa;&#xa;Evidence Worker queries manifest → validates S3 → creates links" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=9;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="680" y="460" width="380" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-chain" value="🔍 Chain of Custody:&#xa;file_job → file_job_artifact → case_evidence → case" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="560" width="380" height="50" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="db-indexes" value="📑 Key Indexes:&#xa;• idx_artifact_file_job_row (file_job_id, row_number)&#xa;• idx_evidence_case_id, idx_evidence_action_id" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=9;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="680" y="620" width="380" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- PUBLISH SCHEDULER -->
+        <mxCell id="scheduler" value="PUBLISH SCHEDULER&#xa;&#xa;Polls outbox table&#xa;Publishes to Kafka&#xa;&#xa;Interval: 5s&#xa;Batch: 100 records" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#f57c00;fontSize=12;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="700" y="730" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- KAFKA TOPICS -->
+        <mxCell id="kafka-container" value="KAFKA TOPICS (AWS MSK)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="730" width="550" height="240" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka1" value="📢 chargeback.new.events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="770" width="510" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka2" value="📢 chargeback.update.events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="810" width="510" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka3" value="📢 case.lifecycle.events (CaseDraftCreated, CaseOpened, CaseEnriched)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#0d47a1;fontSize=11;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="120" y="850" width="510" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka4" value="📢 evidence.requests (EvidenceAttachRequested)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#0d47a1;fontSize=11;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="120" y="890" width="510" height="30" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="kafka5" value="📢 evidence.lifecycle.events (EvidenceAttached, EvidenceFailed)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#bbdefb;strokeColor=#1565c0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="120" y="930" width="510" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- CONSUMERS -->
+        <mxCell id="consumers-container" value="DOMAIN CONSUMERS &amp; WORKERS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="700" y="900" width="850" height="450" as="geometry"/>
+        </mxCell>
+
+        <!-- New Case Consumer -->
+        <mxCell id="consumer1" value="NEW CASE CONSUMER&#xa;&#xa;Subscribe: chargeback.new.events&#xa;&#xa;Actions:&#xa;• INSERT case (DRAFT)&#xa;• INSERT action (OPEN)&#xa;• Emit CaseDraftCreated&#xa;• Emit evidence.requests&#xa;  (if hasEvidence=true)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="720" y="940" width="250" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- Update Case Consumer -->
+        <mxCell id="consumer2" value="UPDATE CASE CONSUMER&#xa;&#xa;Subscribe: chargeback.update.events&#xa;&#xa;Actions:&#xa;• Find existing case&#xa;• INSERT action (new stage)&#xa;• Emit CaseDraftCreated&#xa;• Emit evidence.requests&#xa;  (if hasEvidence=true)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="990" y="940" width="250" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- Evidence Attach Worker -->
+        <mxCell id="evidence-worker" value="EVIDENCE ATTACH WORKER ⭐&#xa;&#xa;Subscribe: evidence.requests&#xa;&#xa;Process:&#xa;1️⃣ Query file_job_artifact (manifest)&#xa;2️⃣ Validate S3 files exist (HEAD)&#xa;3️⃣ INSERT case_evidence links&#xa;4️⃣ Emit EvidenceAttached&#xa;&#xa;Note: ASYNC - doesn't block case" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a5d6a7;strokeColor=#1b5e20;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="940" width="270" height="180" as="geometry"/>
+        </mxCell>
+
+        <!-- File Job Orchestrator -->
+        <mxCell id="orchestrator" value="FILE JOB ORCHESTRATOR&#xa;&#xa;Subscribe: case.lifecycle.events&#xa;&#xa;Actions:&#xa;• Listen: CaseDraftCreated&#xa;• UPDATE file_job_row status&#xa;  OUTBOXED → INGESTED_OK&#xa;• When all rows done: ACK&#xa;&#xa;Note: Not needed for evidence-only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1090" width="250" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- Business Rules Engine -->
+        <mxCell id="bre" value="BUSINESS RULES ENGINE&#xa;&#xa;Subscribe: case.lifecycle.events&#xa;&#xa;Actions:&#xa;• Validate DRAFT cases&#xa;• Transition: DRAFT → OPEN&#xa;• Emit CaseOpened&#xa;&#xa;Note: File-agnostic domain logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="990" y="1090" width="250" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- Enrichment Service -->
+        <mxCell id="enrichment" value="ENRICHMENT SERVICE&#xa;&#xa;Subscribe: case.lifecycle.events&#xa;&#xa;Actions:&#xa;• Call Acquirer Lookup API&#xa;• UPDATE case metadata&#xa;• Emit CaseEnriched&#xa;&#xa;Note: Async - off hot path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="1140" width="270" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- ARROWS -->
+        <!-- S3 to SQS -->
+        <mxCell id="arrow1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57c00;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="s3-inbound" target="sqs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow1-label" value="S3 Event" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="190" width="60" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- SQS to File Processor -->
+        <mxCell id="arrow2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#c62828;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="sqs" target="fp1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow2-label" value="Poll" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#c62828;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="330" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- File Processor to S3 Staging -->
+        <mxCell id="arrow3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#f57c00;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="fp2" target="s3-staging">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow3-label" value="Upload" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="450" width="50" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- File Processor to Database -->
+        <mxCell id="arrow4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#7b1fa2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="fp6" target="db-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow4-label" value="Write" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#7b1fa2;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="630" y="595" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Database to Scheduler -->
+        <mxCell id="arrow5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57c00;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="db-outbox" target="scheduler">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow5-label" value="Poll" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="820" y="680" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Scheduler to Kafka -->
+        <mxCell id="arrow6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="scheduler" target="kafka-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow6-label" value="Publish" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#1565c0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="660" y="770" width="50" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Kafka to Consumers -->
+        <mxCell id="arrow7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="kafka1" target="consumers-container">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow7-label" value="Subscribe" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#2e7d32;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="655" y="920" width="60" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Kafka to Evidence Worker -->
+        <mxCell id="arrow8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1b5e20;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="kafka4" target="evidence-worker">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow8-label" value="Async" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#1b5e20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="960" width="40" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Evidence Worker to Database -->
+        <mxCell id="arrow9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#7b1fa2;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" edge="1" parent="1" source="evidence-worker" target="db-evidence">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="arrow9-label" value="Query + Write" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#7b1fa2;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="1040" width="80" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Evidence Worker to S3 -->
+        <mxCell id="arrow10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#f57c00;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="evidence-worker" target="s3-staging">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1395" y="900"/>
+              <mxPoint x="1500" y="900"/>
+              <mxPoint x="1500" y="260"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow10-label" value="Fetch Files" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=10;fontColor=#f57c00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1450" y="570" width="70" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Flow Number Labels -->
+        <mxCell id="flow-note" value="DATA FLOW SEQUENCE:&#xa;1. ZIP → S3 Inbound → SQS → File Processor&#xa;2. File Processor → Extract → Upload to S3 Staging → Build Manifest → Write DB&#xa;3. Scheduler → Poll Outbox → Publish to Kafka&#xa;4. Kafka → New/Update Case Consumers → Create Case/Action → Emit Events&#xa;5. Evidence Worker → Query Manifest → Fetch from S3 → Link to Case" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e0f7fa;strokeColor=#006064;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1000" width="550" height="120" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
