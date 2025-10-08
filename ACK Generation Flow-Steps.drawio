@@ -1,0 +1,166 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0" version="28.2.5">
+  <diagram id="ack-flow" name="ACK Generation Flow">
+    <mxGraphModel dx="646" dy="416" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="3800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="ACK FILE GENERATION FLOW - CASE CREATION MODE" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=20;fontStyle=1;fontColor=#1b5e20;" parent="1" vertex="1">
+          <mxGeometry x="100" y="20" width="1200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="step1-box" value="STEP 1: CASE CREATION ZIP FILE ARRIVAL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe0b2;strokeColor=#ef6c00;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="80" width="1200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="step1-detail" value="Network uploads CASE CREATION ZIP file to S3&#xa;&#xa;S3 Bucket: /inbound/chargeback_20250115.zip&#xa;Contents: chargeback.csv + evidence files (optional)&#xa;&#xa;CSV Format: networkTransactionId, HPAN, amount, merchantName, ... (FULL case creation data)&#xa;Example row: NET-001, abc123..., 100.00, ACME Corp, ..." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="110" y="110" width="1180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="step2-box" value="STEP 2: S3 EVENT TRIGGER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="220" width="1200" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="step2-detail" value="S3 ObjectCreated event sent to SQS Queue&#xa;&#xa;SQS Queue: wdp-file-arrivals | Message: {bucket, key, file_name}" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="110" y="250" width="1180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="step3-box" value="STEP 3: FILE PROCESSOR - EXTRACT AND PROCESS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffcdd2;strokeColor=#c62828;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="320" width="1200" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="step3-detail" value="File Processor extracts ZIP and detects mode&#xa;&#xa;Mode Detection: CSV contains case creation fields → classify as CREATE_OR_UPDATE mode&#xa;Extract: chargeback.csv (1000 rows) + optional evidence files&#xa;Upload evidence to: S3 /evidence-staging/ (if present)&#xa;&#xa;Create file_job record:&#xa;INSERT file_job (id: file-job-123, file_name: chargeback_20250115.zip, total_rows: 1000, &#xa;                  status: PROCESSING, ack_required: TRUE)&#xa;&#xa;Result: File job tracking initialized, ready to process rows&#xa;⭐ KEY: ack_required = TRUE for case creation mode" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;" parent="1" vertex="1">
+          <mxGeometry x="110" y="350" width="1180" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="step4-box" value="STEP 4: INSERT OUTBOX EVENTS (CHARGEBACK_NEW)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ce93d8;strokeColor=#6a1b9a;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="520" width="1200" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="step4-detail" value="File Processor inserts outbox events for each CSV row&#xa;&#xa;TABLE: outbox&#xa;&#xa;For each row, create outbox record:&#xa;{event_type: CHARGEBACK_NEW,  ← Case creation event type&#xa; route_topic: NULL (uses topic field),&#xa; topic: chargeback.new.events,&#xa; ack_required: TRUE,  ← ACK is required&#xa; payload: {networkTransactionId: NET-001, HPAN: abc123..., amount: 100.00, ...}}&#xa;&#xa;TABLE: file_job_row (tracking for ACK)&#xa;&#xa;INSERT file_job_row (id: row-001, file_job_id: file-job-123, row_number: 1, &#xa;                      status: OUTBOXED, case_id: NULL)&#xa;&#xa;Status: OUTBOXED → waiting for case creation&#xa;&#xa;⭐ KEY: file_job_row.status tracks row-level completion for ACK eligibility" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="550" width="1180" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="step5-box" value="STEP 5: PUBLISH SCHEDULER → CHARGEBACK.NEW.EVENTS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8bbd0;strokeColor=#c2185b;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="760" width="1200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="step5-detail" value="Publish Scheduler reads outbox and publishes to Kafka&#xa;&#xa;TABLE READ: outbox WHERE status = PENDING AND event_type = CHARGEBACK_NEW&#xa;KAFKA TOPIC: chargeback.new.events&#xa;&#xa;Event Payload: {networkTransactionId: NET-001, HPAN: abc123..., amount: 100.00, ...}&#xa;&#xa;TABLE UPDATE: outbox SET status = PUBLISHED" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="790" width="1180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="step6-box" value="STEP 6: NEW CASE CONSUMER CREATES CASE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b2dfdb;strokeColor=#00695c;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="900" width="1200" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="step6-detail" value="New Case Consumer receives Kafka event and creates case&#xa;&#xa;TABLE INSERT: case&#xa;{id: case-001, case_number: CB-001, network_transaction_id: NET-001, amount: 100.00, status: DRAFT}&#xa;&#xa;TABLE INSERT: case_action&#xa;{id: action-001, case_id: case-001, action_type: CH1, status: DRAFT}&#xa;&#xa;Case created successfully" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="930" width="1180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="step7-box" value="STEP 7: EMIT CASEDRAFTCREATED EVENT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="1060" width="1200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="step7-detail" value="New Case Consumer emits lifecycle event&#xa;&#xa;KAFKA TOPIC: case.lifecycle.events&#xa;EVENT: {event: CaseDraftCreated, caseId: case-001, caseNumber: CB-001, &#xa;        networkTransactionId: NET-001, status: DRAFT}&#xa;&#xa;⭐ KEY: This event triggers File Job Orchestrator to update tracking" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="1090" width="1180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="step8-box" value="STEP 8: FILE JOB ORCHESTRATOR UPDATES ROW STATUS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="1200" width="1200" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="step8-detail" value="⭐ CRITICAL: File Job Orchestrator subscribes to case.lifecycle.events&#xa;&#xa;KAFKA SUBSCRIBE: case.lifecycle.events (filter: CaseDraftCreated)&#xa;RECEIVED EVENT: {event: CaseDraftCreated, caseId: case-001, networkTransactionId: NET-001}&#xa;&#xa;Lookup file_job_row by networkTransactionId:&#xa;SELECT * FROM file_job_row fjr&#xa;JOIN outbox o ON o.payload-&gt;&gt;&#39;networkTransactionId&#39; = NET-001&#xa;WHERE fjr.status = OUTBOXED;&#xa;&#xa;TABLE UPDATE: file_job_row&#xa;UPDATE file_job_row SET status = INGESTED_OK, case_id = case-001, updated_at = NOW()&#xa;WHERE id = row-001;&#xa;&#xa;Status: OUTBOXED → INGESTED_OK (successful case creation)&#xa;&#xa;⭐ KEY: This status change is essential for ACK generation eligibility" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="1230" width="1180" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="step9-box" value="STEP 9: FILE JOB ORCHESTRATOR CHECKS COMPLETION CRITERIA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="1400" width="1200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="step9-detail" value="After each row status update, check if file job is ready for ACK&#xa;&#xa;QUERY: Check completion status&#xa;SELECT &#xa;  fj.id, fj.total_rows,&#xa;  COUNT(CASE WHEN fjr.status = &#39;INGESTED_OK&#39; THEN 1 END) as success_count,&#xa;  COUNT(CASE WHEN fjr.status = &#39;FAILED&#39; THEN 1 END) as failed_count,&#xa;  COUNT(CASE WHEN fjr.status IN (&#39;OUTBOXED&#39;, &#39;PROCESSING&#39;) THEN 1 END) as pending_count&#xa;FROM file_job fj&#xa;JOIN file_job_row fjr ON fjr.file_job_id = fj.id&#xa;WHERE fj.id = file-job-123&#xa;GROUP BY fj.id, fj.total_rows;&#xa;&#xa;RESULT: total_rows: 1000, success_count: 1000, failed_count: 0, pending_count: 0&#xa;&#xa;✅ ACK ELIGIBILITY: All rows reached terminal state (INGESTED_OK or FAILED)&#xa;⭐ Trigger ACK generation" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="1416" width="1180" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="step10-box" value="STEP 10: FILE JOB ORCHESTRATOR TRIGGERS ACK GENERATION" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffccbc;strokeColor=#bf360c;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="1620" width="1200" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="step10-detail" value="File Job Orchestrator publishes ACK generation request&#xa;&#xa;KAFKA TOPIC: file.job.ack.requests&#xa;EVENT: {event: AckGenerationRequested, fileJobId: file-job-123, &#xa;        fileName: chargeback_20250115.zip, totalRows: 1000, successCount: 1000, failedCount: 0}&#xa;&#xa;TABLE UPDATE: file_job&#xa;UPDATE file_job SET status = ACK_PENDING WHERE id = file-job-123;&#xa;&#xa;Status: PROCESSING → ACK_PENDING" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="1650" width="1180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="step11-box" value="STEP 11: ACK GENERATOR RECEIVES REQUEST" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="1780" width="1200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="step11-detail" value="ACK Generator Worker subscribes to ACK requests topic&#xa;&#xa;KAFKA SUBSCRIBE: file.job.ack.requests&#xa;RECEIVED EVENT: {event: AckGenerationRequested, fileJobId: file-job-123, fileName: ...}&#xa;&#xa;Worker starts ACK file generation process" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="1810" width="1180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step12-box" value="STEP 12: ACK GENERATOR QUERIES ROW-LEVEL RESULTS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1bee7;strokeColor=#7b1fa2;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="1900" width="1200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="step12-detail" value="ACK Generator queries database for row-level results&#xa;&#xa;TABLE QUERY: file_job_row&#xa;SELECT fjr.row_number, fjr.status, fjr.case_id, fjr.error_message, c.case_number&#xa;FROM file_job_row fjr&#xa;LEFT JOIN case c ON c.id = fjr.case_id&#xa;WHERE fjr.file_job_id = file-job-123&#xa;ORDER BY fjr.row_number;&#xa;&#xa;QUERY RESULTS: 1000 rows&#xa;- Row 1: {row_number: 1, status: INGESTED_OK, case_id: case-001, case_number: CB-001}&#xa;- Row 2: {row_number: 2, status: INGESTED_OK, case_id: case-002, case_number: CB-002}&#xa;- Row 3: {row_number: 3, status: FAILED, error_message: Duplicate transaction ID}&#xa;- ...&#xa;&#xa;Aggregate: 998 successes, 2 failures" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="1930" width="1180" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="step13-box" value="STEP 13: ACK GENERATOR BUILDS ACK FILE CONTENT" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="2120" width="1200" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="step13-detail" value="⭐ ACK Generator constructs ACK file in CSV format&#xa;&#xa;ACK FILE FORMAT:&#xa;rowNumber,status,caseNumber,errorMessage&#xa;1,SUCCESS,CB-001,&#xa;2,SUCCESS,CB-002,&#xa;3,FAILURE,,Duplicate transaction ID&#xa;4,SUCCESS,CB-003,&#xa;...&#xa;&#xa;ACK FILE METADATA (header or separate file):&#xa;{&#xa;  originalFileName: chargeback_20250115.zip,&#xa;  processedAt: 2025-01-15T10:35:00Z,&#xa;  totalRows: 1000,&#xa;  successfulRows: 998,&#xa;  failedRows: 2,&#xa;  successRate: 99.8%&#xa;}&#xa;&#xa;ACK FILE NAME: chargeback_20250115_ACK_20250115T103500.csv&#xa;Convention: {original_file_name}_ACK_{timestamp}.csv&#xa;&#xa;Result: ACK file content ready for upload" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="2150" width="1180" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="step14-box" value="STEP 14: ACK GENERATOR UPLOADS ACK FILE TO S3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a5d6a7;strokeColor=#2e7d32;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="2420" width="1200" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="step14-detail" value="⭐ ACK Generator uploads ACK file to S3 /ack/ bucket&#xa;&#xa;S3 PUT: s3://wdp-chargebacks/ack/chargeback_20250115_ACK_20250115T103500.csv&#xa;Content: ACK file CSV content&#xa;Metadata: {contentType: text/csv, fileJobId: file-job-123, processedRows: 1000}&#xa;&#xa;RESULT: ACK file successfully uploaded to S3&#xa;&#xa;⭐ Network/partner can retrieve ACK file from /ack/ bucket&#xa;Some integrations may trigger S3 event notification to sender" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="2450" width="1180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="step15-box" value="STEP 15: ACK GENERATOR UPDATES FILE JOB STATUS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90caf9;strokeColor=#1565c0;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="2580" width="1200" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="step15-detail" value="ACK Generator updates file job status to mark completion&#xa;&#xa;TABLE UPDATE: file_job&#xa;UPDATE file_job SET &#xa;  status = COMPLETED, &#xa;  ack_file_s3_uri = s3://wdp-chargebacks/ack/chargeback_20250115_ACK_20250115T103500.csv,&#xa;  completed_at = NOW()&#xa;WHERE id = file-job-123;&#xa;&#xa;Status: ACK_PENDING → COMPLETED&#xa;⭐ File processing lifecycle complete" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="2610" width="1180" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="step16-box" value="STEP 16: MOVE ORIGINAL ZIP TO /PROCESSED/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffccbc;strokeColor=#bf360c;fontSize=14;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="100" y="2740" width="1200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="step16-detail" value="After ACK generation, move original ZIP file to processed folder&#xa;&#xa;S3 COPY: /inbound/chargeback_20250115.zip → /processed/chargeback_20250115.zip&#xa;S3 DELETE: /inbound/chargeback_20250115.zip&#xa;&#xa;RESULT: Original file archived, /inbound/ bucket clean&#xa;⭐ Complete file lifecycle: inbound → processing → ACK → processed" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="2770" width="1180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="components-box" value="KEY COMPONENTS FOR ACK GENERATION" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=3;" parent="1" vertex="1">
+          <mxGeometry x="100" y="2900" width="1200" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="components-detail" value="1. FILE JOB ORCHESTRATOR&#xa;   - Subscribes to: case.lifecycle.events (CaseDraftCreated, CaseOpened, etc.)&#xa;   - Updates: file_job_row.status (OUTBOXED → INGESTED_OK or FAILED)&#xa;   - Monitors: Completion criteria (all rows in terminal state)&#xa;   - Triggers: ACK generation request&#xa;&#xa;2. ACK GENERATOR WORKER&#xa;   - Subscribes to: file.job.ack.requests&#xa;   - Queries: file_job_row for row-level results&#xa;   - Builds: ACK CSV file with success/failure details&#xa;   - Uploads: ACK file to S3 /ack/ bucket&#xa;   - Updates: file_job.status to COMPLETED&#xa;&#xa;3. FILE_JOB_ROW STATUS STATES&#xa;   OUTBOXED → Event published to Kafka, awaiting case creation&#xa;   INGESTED_OK → Case successfully created&#xa;   FAILED → Case creation failed (validation error, duplicate, etc.)&#xa;   ⭐ Terminal states: INGESTED_OK, FAILED&#xa;&#xa;4. ACK ELIGIBILITY CRITERIA&#xa;   - All file_job_row records must be in terminal state (INGESTED_OK or FAILED)&#xa;   - No rows can remain in OUTBOXED or PROCESSING&#xa;   - file_job.ack_required must be TRUE" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=11;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="2930" width="1180" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="s3-box" value="S3 BUCKET LAYOUT" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;strokeWidth=3;" parent="1" vertex="1">
+          <mxGeometry x="100" y="3220" width="1200" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="s3-detail" value="S3 BUCKET: s3://wdp-chargebacks/&#xa;&#xa;/inbound/                    ← Original ZIP files arrive here (Step 1)&#xa;  chargeback_20250115.zip&#xa;&#xa;/evidence-staging/           ← Evidence files extracted here (Step 3)&#xa;  file-job-123/&#xa;    receipt_001.jpg&#xa;    dispute_proof_002.pdf&#xa;&#xa;/ack/                        ← ACK files uploaded here (Step 14) ⭐&#xa;  chargeback_20250115_ACK_20250115T103500.csv&#xa;&#xa;/processed/                  ← Completed ZIP files archived here (Step 16)&#xa;  chargeback_20250115.zip" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=10;fontFamily=Courier New;" parent="1" vertex="1">
+          <mxGeometry x="110" y="3250" width="1180" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="arr1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#ef6c00;entryX=0.5;entryY=0;" parent="1" source="step1-box" target="step2-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" parent="1" source="step2-box" target="step3-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#c62828;entryX=0.5;entryY=0;" parent="1" source="step3-box" target="step4-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#6a1b9a;entryX=0.5;entryY=0;" parent="1" source="step4-box" target="step5-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#c2185b;entryX=0.5;entryY=0;" parent="1" source="step5-box" target="step6-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#00695c;entryX=0.5;entryY=0;" parent="1" source="step6-box" target="step7-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57f17;entryX=0.5;entryY=0;" parent="1" source="step7-box" target="step8-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#7b1fa2;entryX=0.5;entryY=0;" parent="1" source="step8-box" target="step9-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;entryX=0.5;entryY=0;" parent="1" source="step9-box" target="step10-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#bf360c;entryX=0.5;entryY=0;" parent="1" source="step10-box" target="step11-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" parent="1" source="step11-box" target="step12-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#7b1fa2;entryX=0.5;entryY=0;" parent="1" source="step12-box" target="step13-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#f57f17;entryX=0.5;entryY=0;" parent="1" source="step13-box" target="step14-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#2e7d32;entryX=0.5;entryY=0;" parent="1" source="step14-box" target="step15-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1565c0;entryX=0.5;entryY=0;" parent="1" source="step15-box" target="step16-box" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
