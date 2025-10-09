@@ -1,0 +1,786 @@
+
+QQuestion and alter design:
+
+🧠 Design Summary – “Evidence Retry via Outbox Requeue”
+🔹 Concept
+
+Instead of relying on file_job_artifact.retry_status alone, your approach adds a Retry Scheduler that:
+
+Scans file_job_row for failed evidence rows belonging to a given file_job_id.
+
+Retrieves corresponding failed artifacts.
+
+Updates the outbox table — sets:
+
+status = 'PENDING'
+
+event_type = 'EVIDENCE_ATTACH_RETRY'
+
+Publisher picks them up and republishes retry events to
+evidence.failed.requests Kafka topic.
+
+Evidence Attach Worker consumes this topic, filters out already-attached references, and retries only the failed evidence files.
+
+Notifications remain unchanged:
+
+N1: sent after first attempt (success/failure summary).
+
+N2: sent after retry cycle completes (second summary).
+
+⚙️ Flow Overview
+Step	Component	Action
+1	Retry Scheduler	Find file_job_row with evidence_status = PARTIALLY_FAILED or FAILED
+2	Database	Update Outbox records to status = PENDING, event_type = EVIDENCE_ATTACH_RETRY
+3	Publisher	Republishes messages to evidence.failed.requests Kafka topic
+4	Evidence Attach Worker	Reads failed files only, reprocesses attachment
+5	Case API	Attempts reattach to existing cases
+6	Notification System	Sends N2 (final merchant notification)
+✅ Advantages
+1. Reuses Existing Infrastructure
+
+Leverages existing outbox pattern and Kafka pipeline.
+
+No need for a separate retry topic or scheduler orchestration logic.
+
+Keeps system event-driven and resilient to restarts.
+
+2. Row-Level Retry Visibility
+
+Ties retries to file_job_row granularity — precise control.
+
+Maintains lineage: ZIP → Row → Artifact → Outbox → Event.
+
+Easy to query all retries for a case or job.
+
+3. Clean Isolation
+
+evidence.failed.requests topic isolates retry logic from the main attach stream.
+
+Reduces risk of interfering with new uploads.
+
+4. Minimal Schema Change
+
+Works with current table model (only relies on updating Outbox rows).
+
+5. Natural Notification Integration
+
+N1 and N2 lifecycle untouched.
+
+N2 can reuse the same success/failure aggregation queries.
+
+⚠️ Potential Drawbacks / Considerations
+1. Coupling to Outbox Layer
+
+Scheduler now depends on Outbox schema and semantics.
+
+If Outbox is reused for other pipelines, risk of side effects unless event_type filter is strict.
+
+2. Row vs Artifact Granularity
+
+Retrying by file_job_row means all failed artifacts under that row are re-queued together.
+
+If partial retry is needed per artifact (e.g., some succeeded in first retry), you may resend duplicates.
+
+Mitigation: The Evidence Worker must always de-duplicate already-attached evidence via file_job_artifact.attachment_status.
+
+3. Kafka Load Management
+
+Depending on volume, re-publishing multiple rows simultaneously could flood retry topic.
+
+Solution: batch size and scheduler throttling parameters (e.g., limit 200 rows/run).
+
+4. Audit Consistency
+
+Need to ensure retry attempts increment retry_count both in file_job_artifact and Outbox metadata for compliance traceability.
+
+5. Failure Category Handling
+
+If root cause was permanent (e.g., CORRUPTED_FILE), retries waste cycles.
+
+Suggest adding a filter:
+
+WHERE evidence_failed_files->>'errorCode' NOT IN ('CORRUPTED_FILE','INVALID_FORMAT')
+
+🧩 Comparison to Existing “Scheduler + Artifact Retry” Design
+Aspect	Artifact-Based Scheduler (Stage 1.2)	Outbox Requeue Scheduler (This Proposal)
+Retry Trigger	Based on file_job_artifact.retry_status	Based on file_job_row.evidence_status
+Retry Granularity	Artifact-level	Row-level
+Event Mechanism	Direct publish to Kafka	Outbox → Publisher → Kafka
+Audit Trace	Strong (artifact retry_count)	Strong if Outbox linked to artifact id
+Complexity	Moderate	Slightly higher (two layers interact)
+Notification Handling	N1/N2 from artifact table	Reuses same logic (no change)
+Best Use Case	Low concurrency, high precision	Larger jobs with batch failure concentration
+🏁 Recommendation
+
+This Outbox Requeue Retry design is solid and production-feasible, provided you ensure:
+
+✅ Evidence Worker deduplicates already-attached artifacts (idempotency).
+
+✅ Scheduler filters out permanently failed files (error-type check).
+
+✅ Retry count and timestamps remain consistent for audit.
+
+✅ Outbox updates are transactional (atomic state transitions).
+
+✅ Volume throttling controls are applied (batch, delay).
+
+It’s slightly more complex, but operationally safer because:
+
+It doesn’t need to coordinate two schedulers.
+
+All retries stay event-driven and naturally integrated with publisher/outbox.
+
+📤 Prompt to Share with Evaluator
+
+Evaluator Review Request — Stage 1.3 Proposal: Evidence Retry via Outbox Requeue
+
+We’ve introduced a Retry Scheduler that reuses the existing Outbox → Publisher → Kafka → Worker loop to handle second attempts for failed evidence attachments.
+
+Summary:
+
+The scheduler scans file_job_row for failed rows within a specific file_job_id.
+
+It reactivates corresponding Outbox events by updating their status to PENDING and event_type to EVIDENCE_ATTACH_RETRY.
+
+Publisher republishes to the evidence.failed.requests Kafka topic.
+
+The Evidence Attach Worker processes only failed evidences, skipping those already attached.
+
+Notifications follow the finalized pattern — N1 (initial) and N2 (final retry results).
+
+Key Benefits:
+
+Reuses existing infrastructure (Outbox + Publisher + Worker)
+
+Clean separation of retry events (evidence.failed.requests)
+
+Maintains audit and traceability with minimal schema change
+
+Naturally aligns with existing notification flow
+
+Open Points for Evaluation:
+
+Is row-level retry (vs. artifact-level) sufficient for future scalability?
+
+Should we filter retries by error type (to avoid permanent errors)?
+
+Any concerns with coupling retry logic to the Outbox schema?
+
+Any suggestions to simplify or extend audit logging across Outbox → Artifact → Notification chain?
+
+Verdict Sought: Confirm whether this Outbox Requeue Retry pattern should become the baseline for Stage 1.3 (vs. artifact-based scheduler).
+
+
+
+Evaluation:
+
+Evaluation Request Received - Stage 1.3: Evidence Retry via Outbox Requeue
+Let me search the project knowledge to understand the full context of your dispute architecture and compare this proposal against previous stages.Searched project for “evidence attach retry scheduler Stage 1 artifact retry_status file_job_artifact”6 resultscgpt-stage1-final-mermaid.txt2 relevant sectionstextwdp-impl-diagrams.md3 relevant sectionstextwdp-debates.mdtextdiagrams.drawio2 relevant sectionstextWDP System Components & Architecture.txttextwdp-component-catalog.mdtextProbed Stage 1 architecture and retry mechanism details.Good, I found information about the existing Stage 1 architecture. Now let me search for more specific information about the retry mechanisms, Stage 1.2, and any existing retry designs.Searched project for “retry failed evidence attach Stage 1.2 1.3 scheduler artifact file_job_row evidence_status PARTIALLY_FAILED”6 resultscgpt-stage1-final-mermaid.txt2 relevant sectionstextwdp-impl-diagrams.md3 relevant sectionstextdiagrams.drawio2 relevant sectionstextWDP System Components & Architecture.txttextwdp-component-catalog.mdtextwdp-impl-status.mdtextProbed retry logic for evidence attachment in chargeback system.I haven't found specific information about Stage 1.2 or Stage 1.3 retry designs yet. Let me search for more information about evidence retry, notifications, and any mentions of N1, N2 notifications.Searched project for “notification N1 N2 merchant evidence failed success summary retry final”8 resultswdp-open-questions.mdtextwdp-impl-diagrams.md2 relevant sectionstextCurrent Working State & Roadmap.txttextwdp-reqs-risks.mdtextWDP Requirements & Constraints.txt2 relevant sectionstextWDP Open Questions & Pending Decisions.txttextOpen Design Decisions (Pending).txttextWDP Centralized Dispute Platform - Architecture Evaluation Summary.txttextProbed evidence attach retry logic for dispute architecture.Good! Now I'm getting more context. I can see that there are notifications (N1 and N2 are mentioned in the design summary document), and I can see the existing architecture with the Evidence Attach Worker. Let me search for more specific information about evidence attach failures, retry mechanisms, and any existing Stage 1.2 design.Searched project for “evidence.failed.requests evidence attach failure error attachment_status CORRUPTED_FILE INVALID_FORMAT retry mechanism”8 resultswdp-impl-diagrams.mdtextContentious Points Evaluator Flags.txttextcgpt-stage1-final-mermaid.txttextwdp-component-catalog.md2 relevant sectionstextdiagrams.drawio2 relevant sectionstextWDP System Components & Architecture.txttextPatterns Technologies Selected.txttextWDP Open Questions & Pending Decisions.txttextProbed evidence attachment retry logic for chargeback system.Great! Now I have a much better understanding of the system. Let me search for any more specific information about evidence attachment failures and the proposal's outbox structure.Now let me review your Stage 1.3: Evidence Retry via Outbox Requeue proposal as the evaluator for the dispute architecture.
+📋 Evaluation: Stage 1.3 Evidence Retry Mechanism
+Executive Summary
+The proposed "Evidence Retry via Outbox Requeue" design is architecturally sound and operationally pragmatic, successfully reusing existing infrastructure while maintaining clean separation of concerns. However, there are critical implementation details and architectural alignment questions that must be addressed before finalizing this as the Stage 1.3 baseline.
+
+✅ Strengths of the Proposal
+1. Excellent Infrastructure Reuse
+The design leverages the existing Outbox → Publisher → Kafka → Worker pipeline without introducing parallel retry orchestration. This:
+
+Maintains consistency with Stage 1 patterns
+Reduces operational complexity (one scheduler pattern, not two)
+Ensures event-driven resilience
+
+2. Clean Event Isolation
+Creating a dedicated evidence.failed.requests Kafka topic:
+
+Isolates retry traffic from initial attachment flow
+Enables independent monitoring and alerting
+Prevents retry storms from impacting new uploads
+Excellent design choice ✅
+
+3. Proper Granularity Alignment
+Using file_job_row as the retry unit aligns with your existing tracking model where:
+
+One row = one CSV line = multiple potential evidence artifacts
+Row-level evidence_status (PARTIALLY_FAILED / FAILED) already exists
+Natural boundary for batch retry operations
+
+4. Notification Flow Compatibility
+Maintaining the N1 (initial) and N2 (final) notification lifecycle without changes demonstrates good backward compatibility.
+
+⚠️ Critical Questions & Concerns
+🔴 CRITICAL #1: Schema & Table Alignment
+Issue: Your document refers to file_job_artifact.attachment_status and file_job_artifact.retry_count, but the existing project knowledge shows:
+
+file_job_artifact is described as an evidence manifest table
+No explicit attachment_status or retry_count columns are documented
+
+Questions:
+
+Does file_job_artifact currently track attachment status per artifact?
+
+If YES: What are the possible values? (PENDING, ATTACHED, FAILED?)
+If NO: How does the Evidence Attach Worker currently know which artifacts failed?
+
+
+Where is retry_count stored?
+
+At the file_job_row level?
+At the file_job_artifact level?
+In the Outbox?
+
+
+How does evidence_status on file_job_row relate to individual artifact failures?
+
+Is it an aggregated status derived from all artifacts?
+Example: 5 artifacts, 2 failed → PARTIALLY_FAILED? All failed → FAILED?
+
+
+
+Recommendation:
+
+Document the exact schema for file_job_artifact including all status/retry fields
+Clarify the relationship between row-level evidence_status and artifact-level tracking
+Define the state machine for evidence attachment states
+
+
+🔴 CRITICAL #2: Idempotency & Deduplication Strategy
+Issue: The proposal states:
+
+"The Evidence Worker must always de-duplicate already-attached evidence via file_job_artifact.attachment_status"
+
+Questions:
+
+How does idempotency work across retries?
+
+If 3 artifacts under a row, and 1 already succeeded, does the retry event contain all 3 or just the 2 failed ones?
+Does the Worker query the database on every retry to filter out successful ones?
+
+
+What if an artifact succeeded in Attempt 1 but the database update failed?
+
+Evidence is attached to the case, but attachment_status still shows PENDING
+Retry would duplicate the attachment
+
+
+Outbox event structure for retries:
+
+json   {
+     "event_type": "EVIDENCE_ATTACH_RETRY",
+     "file_job_row_id": "12345",
+     "case_id": "abc-def",
+     "artifacts": [
+       {"artifact_id": "A1", "s3_uri": "..."},  // All artifacts?
+       {"artifact_id": "A2", "s3_uri": "..."}   // Or only failed ones?
+     ]
+   }
+Which approach do you use?
+Recommendation:
+
+Option A (Preferred): Outbox event contains ALL artifacts from the row, Worker filters by querying file_job_artifact.attachment_status
+
+Pros: Simpler Scheduler logic, Worker owns deduplication
+Cons: Slightly more Worker DB queries
+
+
+Option B: Scheduler pre-filters and only queues failed artifacts
+
+Pros: Smaller events, less Worker filtering
+Cons: Scheduler becomes more complex, couples retry logic to artifact schema
+
+
+
+
+🟡 HIGH PRIORITY #3: Error Category Filtering
+Strong agreement with your recommendation:
+sqlWHERE evidence_failed_files->>'errorCode' NOT IN ('CORRUPTED_FILE','INVALID_FORMAT')
+Questions:
+
+Where is evidence_failed_files stored?
+
+In file_job_row as JSONB?
+In file_job_artifact?
+
+
+What are ALL the error codes?
+
+CORRUPTED_FILE (permanent)
+INVALID_FORMAT (permanent)
+S3_NOT_FOUND (permanent? or transient if eventual consistency?)
+ATTACHMENT_API_TIMEOUT (transient)
+CASE_NOT_FOUND (permanent if case deleted, transient otherwise?)
+
+
+Should permanent failures still appear in N2 summary notifications?
+
+User needs to know why some evidence never attached
+
+
+
+Recommendation:
+
+Define exhaustive error taxonomy (transient vs permanent)
+Store error details at both row and artifact level for audit
+Include permanent failures in N2 with clear "Cannot Retry" status
+
+
+🟡 HIGH PRIORITY #4: Retry Count & Backoff Strategy
+Issue: Document mentions retry_count but doesn't specify:
+
+Max retry attempts before marking row as permanently failed
+Backoff strategy (immediate? exponential? fixed delay?)
+How does Scheduler set next_attempt_at?
+
+Recommendation:
+Adopt a strategy similar to your existing Enrichment Service pattern:
+yamlevidence-retry:
+  max-attempts: 3
+  backoff: exponential
+  initial-delay: 5m
+  max-delay: 1h
+  multiplier: 2
+Example timeline:
+
+Attempt 1: Immediate (initial attach via evidence.requests)
+Attempt 2: 5 minutes after failure
+Attempt 3: 15 minutes after Attempt 2 (5m × 2 + jitter)
+Attempt 4 (final): 30 minutes after Attempt 3
+
+
+🟡 MEDIUM PRIORITY #5: Notification Timing (N1 vs N2)
+Question: When exactly are N1 and N2 sent?
+Current Understanding:
+
+N1 (Initial): Sent after CaseOpened event (after Business Rules validation)
+
+Contains: Success/failure summary of first attach attempt
+Example: "10 evidence files attached, 2 failed"
+
+
+N2 (Final): Sent after retry cycle completes
+
+Contains: Final summary after all retry attempts
+Example: "12 evidence files attached, 0 failed" (if retries succeeded)
+
+
+
+Questions:
+
+Who triggers N2?
+
+Does the Evidence Attach Worker emit an EvidenceRetryCompleted event?
+Or does File Job Orchestrator detect "all rows have exhausted retries"?
+
+
+What if retries never complete (stuck in retry loop due to persistent transient errors)?
+
+Is there a timeout after which N2 is sent anyway?
+
+
+Can N2 be sent multiple times if a merchant uploads more evidence later?
+
+Or is it strictly a "file ingestion complete" notification?
+
+
+
+Recommendation:
+
+Define explicit trigger for N2 (event-based preferred over scheduled check)
+Add timeout safeguard (e.g., force N2 after 24 hours regardless of retry status)
+Consider user expectations: Merchants may expect real-time updates, not batch summaries
+
+
+🟢 NICE TO HAVE #6: Observability & Monitoring
+The design doesn't explicitly mention:
+
+Metrics to track:
+
+Evidence attach success rate (first attempt vs after retries)
+Retry effectiveness (% of failures recovered by retries)
+Time to N2 (how long until final notification sent)
+
+
+Alerts to configure:
+
+High rate of permanent failures
+Retry queue depth > threshold
+N2 not sent within SLA
+
+
+
+Recommendation:
+
+Add monitoring requirements to the design document
+Define SLAs (e.g., "N2 sent within 30 minutes of final retry")
+
+
+🎯 Architectural Alignment
+Comparison to "Artifact-Based Scheduler" (Stage 1.2)
+AspectStage 1.2 (Artifact Scheduler)Stage 1.3 (Outbox Requeue)Evaluator ViewRetry GranularityPer-artifactPer-row✅ Row-level appropriateInfrastructure ReuseNew scheduler + direct KafkaExisting Outbox pattern✅ Excellent reuseComplexityModerateHigher (2 layers)⚠️ Acceptable if well-documentedIdempotencyArtifact retry_statusWorker deduplication⚠️ Needs clarity (see Critical #2)ScalabilityGoodGood✅ Both scale wellObservabilityDirect metricsIndirect (via Outbox)⚠️ Requires dashboard design
+Verdict: Stage 1.3 is architecturally superior for long-term maintainability, provided the idempotency and schema concerns are resolved.
+
+📊 Risk Assessment
+RiskSeverityMitigationAccidental duplicate attachments🔴 HIGHImplement robust Worker-side deduplication with attachment_status checksRetry storms after outage🟡 MEDIUMAdd throttling in Scheduler (batch size + delay)Permanent failures waste cycles🟡 MEDIUMImplement error-code filteringOutbox schema coupling🟢 LOWUse versioned event schemas, abstract Outbox details in WorkerN2 notification delays🟡 MEDIUMAdd timeout-based N2 trigger
+
+🏁 Final Recommendation
+✅ APPROVE Stage 1.3 as the baseline CONDITIONAL on:
+
+Immediate Requirements (Blocking):
+
+✅ Document complete file_job_artifact schema with attachment_status and retry_count
+✅ Define idempotency strategy (Option A recommended: Worker-side filtering)
+✅ Specify error code taxonomy (transient vs permanent)
+✅ Define retry backoff parameters (max attempts, delays)
+
+
+Before Implementation:
+
+✅ Define N2 trigger mechanism (event or timeout)
+✅ Add error-code filtering in Scheduler query
+✅ Design monitoring dashboard (retry metrics, N2 latency)
+
+
+Nice-to-Have (Can defer):
+
+Separate retry topic per error category (e.g., evidence.failed.transient, evidence.failed.permanent)
+Row-level retry circuit breaker (auto-stop retries if case deleted)
+
+
+
+
+🎤 Questions for Architecture Team
+
+Can you share the exact DDL for file_job_artifact? (schema validation)
+Where is retry_count incremented? (Outbox, artifact table, or both?)
+Who owns N2 notification triggering? (Worker, Orchestrator, or Notification Service?)
+What happens if a case is deleted mid-retry? (orphaned evidence handling)
+Is there a Stage 1 ADR documenting the original Evidence Attach Worker design? (for consistency check)
+
+
+Evaluator Verdict: APPROVED with Required Clarifications ✅
+The Outbox Requeue pattern is a solid choice that respects your existing architecture. Address the schema and idempotency questions, and this becomes your Stage 1.3 baseline.
+
+
+Solution:
+
+Stage 1.3 — Evidence Retry via Outbox Requeue
+Implementation Requirements (Finalized)
+1) Data Model (DDL)
+1.1 file_job_artifact (per-artifact audit + idempotency source of truth)
+-- Core identity
+id UUID PRIMARY KEY,
+file_job_id UUID NOT NULL,
+file_job_row_id UUID NOT NULL,
+case_id UUID NOT NULL,
+file_name TEXT NOT NULL,
+file_type TEXT,
+file_size_bytes BIGINT,
+s3_key TEXT NOT NULL,
+
+-- Attachment lifecycle
+attachment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+  -- ENUM: PENDING | ATTACHED | FAILED
+,attachment_error_code VARCHAR(64) NULL
+,attachment_error_message TEXT NULL
+,attached_at TIMESTAMPTZ NULL
+,attempt_count INT NOT NULL DEFAULT 0        -- all attempts incl. initial
+,retry_count   INT NOT NULL DEFAULT 0        -- attempts after initial only
+
+-- Retry orchestration fields (used by scheduler)
+,retry_status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+  -- ENUM: PENDING | RETRY_SCHEDULED | RETRYING | RETRY_SUCCESS | RETRY_FAILED | PERMANENT_FAILED
+,next_retry_at TIMESTAMPTZ NULL
+,last_retry_at TIMESTAMPTZ NULL
+
+-- Error taxonomy
+,error_category VARCHAR(20) GENERATED ALWAYS AS (
+  CASE
+    WHEN attachment_error_code IN ('ATTACHMENT_API_TIMEOUT','503','NETWORK_TIMEOUT') THEN 'NETWORK'
+    WHEN attachment_error_code IN ('500','SYSTEM_ERROR')                             THEN 'SYSTEM'
+    WHEN attachment_error_code IN ('CORRUPTED_FILE','INVALID_FORMAT','S3_NOT_FOUND') THEN 'DATA'
+    WHEN attachment_error_code IN ('401','403','UNAUTHORIZED','CASE_NOT_FOUND')      THEN 'AUTH'
+    ELSE 'SYSTEM'
+  END
+) STORED
+,is_retryable BOOLEAN GENERATED ALWAYS AS (
+  error_category IN ('NETWORK','SYSTEM') AND retry_count < 2
+) STORED,
+
+-- Ops
+,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Partial/covering indexes to power the scheduler & notifications
+CREATE INDEX IF NOT EXISTS idx_artifact_retry_scan
+  ON file_job_artifact (next_retry_at, retry_count)
+  WHERE retry_status IN ('PENDING','RETRY_FAILED') AND retry_count < 2;
+
+CREATE INDEX IF NOT EXISTS idx_artifact_retry_cover
+  ON file_job_artifact (next_retry_at, retry_count)
+  INCLUDE (id, file_job_id, file_job_row_id, s3_key, case_id, retry_status, attachment_status)
+  WHERE retry_status IN ('PENDING','RETRY_FAILED') AND retry_count < 2;
+
+CREATE INDEX IF NOT EXISTS idx_artifact_by_job_row
+  ON file_job_artifact (file_job_id, file_job_row_id);
+
+1.2 file_job_row (row-level rollups used by notifications)
+-- Add / confirm rollups for fast N1/N2
+ALTER TABLE file_job_row
+  ADD COLUMN IF NOT EXISTS evidence_count INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS evidence_attached_count INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS evidence_failed_count INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS evidence_status VARCHAR(20) DEFAULT 'PENDING'
+  -- ENUM: PENDING | COMPLETED | PARTIALLY_FAILED | FAILED
+  ,
+  ADD COLUMN IF NOT EXISTS evidence_failed_files JSONB NULL,  -- per-row summary (optional)
+  ADD COLUMN IF NOT EXISTS evidence_completed_at TIMESTAMPTZ NULL;
+
+
+Relationship: file_job_row.evidence_status is derived from artifact facts
+
+COMPLETED when all artifacts ATTACHED
+
+FAILED when all artifacts FAILED/PERMANENT_FAILED
+
+PARTIALLY_FAILED otherwise.
+
+2) Event Contracts
+2.1 Outbox “retry” event (Option A — send all artifacts; worker filters)
+{
+  "event_id": "uuid",
+  "event_type": "EVIDENCE_ATTACH_RETRY",
+  "occurred_at": "2025-10-08T10:33:00Z",
+  "file_job_id": "uuid",
+  "file_job_row_id": "uuid",
+  "case_id": "uuid",
+  "artifacts": [
+    { "artifact_id": "uuid", "s3_key": "s3://.../file.jpg" },
+    { "artifact_id": "uuid", "s3_key": "s3://.../invoice.pdf" }
+  ],
+  "retry_reason": "AUTOMATED_RETRY",
+  "schema_version": 1
+}
+
+
+Why Option A: simpler scheduler, canonical idempotency at worker (DB check), works even if first-pass DB write failed after a real attach.
+
+2.2 Kafka topics
+
+Initial: evidence.attach.requests
+
+Retry: evidence.failed.requests (this proposal)
+
+Results: evidence.attach.results (success/failure per artifact)
+
+3) Scheduler Logic (Outbox Requeue)
+
+Selection (row-level):
+
+Input scope: file_job_id = ?
+
+Rows: evidence_status IN ('PARTIALLY_FAILED','FAILED')
+
+Artifact filter (permanent errors excluded):
+
+SELECT a.id
+FROM file_job_artifact a
+WHERE a.file_job_row_id = :rowId
+  AND a.attachment_status <> 'ATTACHED'
+  AND a.attachment_error_code NOT IN ('CORRUPTED_FILE','INVALID_FORMAT')
+  AND (a.retry_count < :max_retries);
+
+
+Requeue (atomic):
+
+For each selected row:
+
+Build event payload with all row artifacts (Option A).
+
+Insert/Upsert Outbox record: status='PENDING', event_type='EVIDENCE_ATTACH_RETRY'.
+
+(Optional) Update artifacts’ retry_status='RETRY_SCHEDULED', next_retry_at=now(), retry_count=retry_count+1, last_retry_at=now() only if publish succeeds.
+
+Backoff (configurable exponential):
+
+evidence-retry:
+  max-attempts: 3       # initial + 2 retries
+  backoff:
+    strategy: exponential
+    initial-delay: 5m
+    multiplier: 2
+    max-delay: 60m
+    jitter-pct: 0.2
+
+
+Scheduler uses backoff to set next_retry_at for artifacts after a failed retry.
+
+Throughput protections:
+
+batch_size_rows: 200
+
+sleep_between_batches: 2–5s
+
+ShedLock on scheduler method
+
+FOR UPDATE SKIP LOCKED when touching artifacts directly
+
+4) Evidence Attach Worker — Idempotency (Authoritative Design)
+
+Rule 0 (idempotent gate, hard stop):
+Before attempting any attachment in a retry event, for each artifact:
+
+SELECT attachment_status, attached_at
+FROM file_job_artifact
+WHERE id = :artifact_id FOR UPDATE;
+
+
+If attachment_status='ATTACHED' → skip (already done).
+
+If not attached:
+
+Attempt attach → on real success:
+
+Write: attachment_status='ATTACHED', attached_at=now(), attempt_count=attempt_count+1 and clear error fields.
+
+Emit result: EvidenceArtifactResult{status:'ATTACHED'}.
+
+On failure (transient or permanent):
+
+Write: attachment_status='FAILED', set attachment_error_code/message, attempt_count+=1, and if retryable:
+
+retry_status='RETRY_FAILED', set next_retry_at via backoff and retry_count+=1.
+
+Emit result: EvidenceArtifactResult{status:'FAILED', error_code:...}.
+
+Why DB-first check?
+Covers the race where the case API call succeeded but DB write failed (network blip). On the next retry, we’ll see ATTACHED and skip.
+
+5) Notifications (N1 / N2)
+N1 (Initial)
+
+Gate: when all artifacts of the file_job_id have at least one attempt.
+
+SELECT
+  (SELECT COUNT(*) FROM file_job_artifact WHERE file_job_id=:fid) =
+  (SELECT COUNT(*) FROM file_job_artifact WHERE file_job_id=:fid AND attempt_count >= 1)
+  AS all_attempted;
+
+
+If true and file_job.n1_sent_at IS NULL → send N1 (success/failed breakdown + retry promise) and set n1_sent_at.
+
+N2 (Final)
+
+Preferred trigger (event-based): Notification service subscribes to evidence.attach.results and, on any result for the file_job_id, evaluates:
+
+SELECT COUNT(*) = 0 AS retry_settled
+FROM file_job_artifact
+WHERE file_job_id=:fid
+  AND is_retryable = true
+  AND retry_status IN ('PENDING','RETRY_FAILED','RETRY_SCHEDULED','RETRYING');
+
+
+If retry_settled=true AND n2_sent_at IS NULL:
+
+Build N2 summary:
+
+total, attached, permanent_failed (DATA/AUTH), recovered_by_retry (retry_count>0 AND ATTACHED)
+
+include per-error breakdown; highlight non-retryable items
+
+Send N2; set n2_sent_at.
+
+Timeout safeguard: if still not settled after 24h from N1, force-send N2 with current state; mark remaining retryables as PERMANENT_FAILED (configurable flag).
+
+6) Monitoring & Alerts
+
+Core metrics
+
+evidence.attach.first_attempt.success_rate
+
+evidence.attach.retry.success_rate
+
+evidence.retry.queue.depth (rows and artifacts)
+
+evidence.n2.latency.seconds (N1→N2 delta)
+
+evidence.permanent_failures.count (by error_code)
+
+scheduler.duration.seconds, scheduler.batch.size, scheduler.circuit_breaker.open.count
+
+Alerts
+
+High permanent failure rate (>10% in 1h)
+
+Retry queue depth > threshold (e.g., >500 artifacts for 10m)
+
+N2 latency > SLA (e.g., >6h average or >24h forced)
+
+Scheduler not heartbeating in >15m
+
+7) Edge Cases / Policies
+
+Case deleted mid-retry: worker detects 404/CASE_NOT_FOUND → mark artifact attachment_status='FAILED', retry_status='PERMANENT_FAILED', error_code CASE_NOT_FOUND. Included in N2 as “Cannot Retry.”
+
+Outbox requeue duplicates: worker’s DB pre-check prevents duplicate attachments.
+
+New evidence arrives after N2: it’s a new file_job → will produce its own N1/N2 (we don’t mutate a closed job’s N2).
+
+8) Direct answers to evaluator’s questions
+
+Exact DDL: Included above (attachment_status, attempt_count, retry_count, retry fields).
+
+Where is retry_count incremented?
+
+In worker after a retry failure; scheduler may increment when scheduling (optional), but worker is source of truth.
+
+Who owns N2 trigger?
+
+Notification Service (event-driven gate on DB). Timeout fallback at 24h.
+
+How is row evidence_status derived?
+
+From artifact aggregates (see §1.2).
+
+Idempotency approach:
+
+Option A — outbox event includes all row artifacts; worker filters by live DB status under row lock.
+
+9) Pros & Cons of this approach (crisp)
+
+Pros
+
+Strong infra reuse (Outbox + Publisher); single mental model.
+
+Worker-centric idempotency is robust against partial DB/write failures.
+
+Clear notification lifecycle; no change to merchant contracts.
+
+Scales with batch tuning; retry traffic isolated on dedicated topic.
+
+Cons
+
+Slightly larger retry events (contains all artifacts); mitigated by worker filtering.
+
+Requires tight DB discipline (row locks; indexes).
+
+Two places track “retry”: outbox + artifact table; must keep artifact table as source of truth.
+
+10) Ready-to-send prompt (Evaluator follow-up)
+
+Stage 1.3 — Implementation Pack for “Evidence Retry via Outbox Requeue”
+
+We addressed all “Required Clarifications”:
+
+Final DDL for file_job_artifact with attachment_status, attempt_count, retry_count, retry_* fields and error taxonomy.
+
+Idempotency strategy (Option A): retry events include all row artifacts; the Worker performs a DB-first status check and skips already-attached items (covers API-success/DB-fail races).
+
+Error taxonomy and filtering: permanent errors (CORRUPTED_FILE, INVALID_FORMAT, CASE_NOT_FOUND, AUTH) are excluded from retries and reported in N2 as “Cannot Retry.”
+
+Backoff policy: exponential (5m initial, ×2, max 60m, jitter); max attempts = 3 (initial + 2 retries).
+
+N1/N2 contract: N1 when all artifacts have an initial attempt; N2 when no retryables are in-flight (event-gated) or a 24h timeout passes.
+
+Monitoring: metrics and alert set for retry queue depth, N2 latency, permanent failures, and scheduler health.
+
+Request: Please confirm this meets the “Approved with Clarifications” bar and we’ll proceed to implementation and test plans.
+
