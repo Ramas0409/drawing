@@ -1,0 +1,251 @@
+sequenceDiagram
+    participant S3 as S3 Bucket
+    participant FP as File Processor
+    participant DB as Aurora PostgreSQL
+    participant PS as Publisher Scheduler<br/>(every 2 min)
+    participant K as Kafka<br/>evidence.requests
+    participant EW as Evidence Worker
+    participant DM as Document Mgmt API
+    participant NS as Notification Service
+    participant M as Merchant
+
+    Note over S3,M: STAGE 1.4: UNIFIED FILE OUTBOX MODEL WITH RETRY & NOTIFICATIONS
+
+    %% File Upload and Initial Processing
+    rect rgb(232, 245, 233)
+        Note over S3,DB: 1. FILE INGESTION & DATABASE INSERTION
+        S3->>FP: 1.1 ZIP file uploaded (CSV + Evidence)
+        activate FP
+        FP->>FP: 1.2 Parse CSV (1000 rows/batch)
+        FP->>FP: 1.3 Extract evidence files
+        FP->>S3: 1.4 Upload evidence to /staging/
+        
+        FP->>DB: 1.5 INSERT INTO file_job<br/>(status='PROCESSING', total_rows=N)
+        activate DB
+        DB-->>FP: file_job_id
+        deactivate DB
+        
+        FP->>DB: 1.6 INSERT INTO file_outbox_row<br/>(status='PENDING', retry_count=0)<br/>FOR EACH CSV ROW
+        activate DB
+        DB-->>FP: file_outbox_row_id (bulk)
+        deactivate DB
+        
+        FP->>DB: 1.7 INSERT INTO file_job_artifact<br/>(attachment_status='PENDING')<br/>FOR EACH EVIDENCE FILE
+        activate DB
+        DB-->>FP: artifact_ids (bulk)
+        deactivate DB
+        deactivate FP
+    end
+
+    %% First Publish Cycle
+    rect rgb(255, 243, 224)
+        Note over PS,K: 2. FIRST ATTEMPT (retry_count=0) - PUBLISHER CYCLE
+        PS->>DB: 2.1 SELECT * FROM file_outbox_row<br/>WHERE status='PENDING'<br/>FOR UPDATE SKIP LOCKED<br/>LIMIT 100
+        activate DB
+        DB-->>PS: Rows with retry_count=0
+        deactivate DB
+        
+        loop For each row
+            PS->>PS: 2.2 Build event {retry_count: 0}
+            PS->>K: 2.3 Publish event
+            activate K
+            K-->>PS: Kafka offset
+            deactivate K
+            
+            PS->>DB: 2.4 UPDATE file_outbox_row<br/>SET status='PUBLISHED',<br/>kafka_offset=X
+            activate DB
+            deactivate DB
+            
+            PS->>DB: 2.5 INSERT INTO file_outbox_row_audit<br/>(old='PENDING', new='PUBLISHED',<br/>transitioned_by='PUBLISHER')
+            activate DB
+            deactivate DB
+        end
+    end
+
+    %% First Consumption - Success Path
+    rect rgb(252, 228, 236)
+        Note over K,DM: 3. EVIDENCE WORKER - FIRST ATTEMPT (SUCCESS PATH)
+        K->>EW: 3.1 Consume event {retry_count: 0}
+        activate EW
+        
+        EW->>DB: 3.2 SELECT * FROM file_job_artifact<br/>WHERE file_outbox_row_id=?
+        activate DB
+        DB-->>EW: List of evidence files
+        deactivate DB
+        
+        EW->>S3: 3.3 Fetch evidence files from S3
+        activate S3
+        S3-->>EW: Evidence file data
+        deactivate S3
+        
+        EW->>DM: 3.4 POST /attach-evidence<br/>{case_id, files[]}
+        activate DM
+        DM-->>EW: 200 OK {document_mgmt_ids}
+        deactivate DM
+        
+        EW->>DB: 3.5 UPDATE file_job_artifact<br/>SET attachment_status='ATTACHED',<br/>document_mgmt_id=X
+        activate DB
+        deactivate DB
+        
+        EW->>DB: 3.6 UPDATE file_outbox_row<br/>SET status='SUCCESS'
+        activate DB
+        deactivate DB
+        
+        EW->>DB: 3.7 INSERT INTO file_outbox_row_audit<br/>(old='PUBLISHED', new='SUCCESS',<br/>retry_count=0,<br/>transitioned_by='EVIDENCE_WORKER')
+        activate DB
+        deactivate DB
+        deactivate EW
+    end
+
+    %% N1 Notification
+    rect rgb(255, 249, 196)
+        Note over NS,M: 4. N1 NOTIFICATION - AFTER FIRST ATTEMPT
+        NS->>DB: 4.1 Check if all retry_count=0 done<br/>SELECT COUNT(*)<br/>WHERE file_job_id=? AND retry_count=0<br/>AND status IN ('SUCCESS','FAILED')
+        activate DB
+        DB-->>NS: All first attempts complete
+        deactivate DB
+        
+        NS->>DB: 4.2 SELECT status, COUNT(*)<br/>WHERE file_job_id=? AND retry_count=0<br/>GROUP BY status
+        activate DB
+        DB-->>NS: {SUCCESS: 980, FAILED: 20}
+        deactivate DB
+        
+        NS->>DB: 4.3 UPDATE file_job<br/>SET success_count=980,<br/>error_count=0,<br/>pending_retries=20
+        activate DB
+        deactivate DB
+        
+        NS->>M: 4.4 Send N1 Notification<br/>"Initial Results: 980 success, 20 pending retry"
+        activate M
+        M-->>NS: Notification received
+        deactivate M
+    end
+
+    %% First Consumption - Failure Path (for retry)
+    rect rgb(252, 228, 236)
+        Note over K,DM: 5. EVIDENCE WORKER - FIRST ATTEMPT (FAILURE PATH)
+        K->>EW: 5.1 Consume event {retry_count: 0}
+        activate EW
+        
+        EW->>DB: 5.2 SELECT * FROM file_job_artifact
+        activate DB
+        DB-->>EW: Evidence files
+        deactivate DB
+        
+        EW->>DM: 5.3 POST /attach-evidence
+        activate DM
+        DM-->>EW: ❌ 500 Internal Server Error
+        deactivate DM
+        
+        EW->>DB: 5.4 UPDATE file_outbox_row<br/>SET status='FAILED',<br/>retry_count=0,<br/>next_retry_at=NOW() + 6 hours,<br/>error_code='API_ERROR'
+        activate DB
+        deactivate DB
+        
+        EW->>DB: 5.5 INSERT INTO file_outbox_row_audit<br/>(old='PUBLISHED', new='FAILED',<br/>retry_count=0,<br/>error_code='API_ERROR',<br/>transitioned_by='EVIDENCE_WORKER')
+        activate DB
+        deactivate DB
+        deactivate EW
+    end
+
+    %% Wait for retry
+    Note over PS,K: ⏰ WAIT 6 HOURS (next_retry_at)
+
+    %% Second Publish Cycle (Retry 1)
+    rect rgb(255, 243, 224)
+        Note over PS,K: 6. SECOND ATTEMPT (retry_count=1) - PUBLISHER CYCLE
+        PS->>DB: 6.1 SELECT * FROM file_outbox_row<br/>WHERE status='FAILED'<br/>AND retry_count < 2<br/>AND next_retry_at <= NOW()<br/>FOR UPDATE SKIP LOCKED
+        activate DB
+        DB-->>PS: Rows for retry (retry_count=0)
+        deactivate DB
+        
+        PS->>PS: 6.2 Increment retry_count (0→1)
+        PS->>PS: 6.3 Build event {retry_count: 1}
+        PS->>K: 6.4 Publish retry event
+        activate K
+        K-->>PS: Kafka offset
+        deactivate K
+        
+        PS->>DB: 6.5 UPDATE file_outbox_row<br/>SET status='PUBLISHED',<br/>retry_count=1
+        activate DB
+        deactivate DB
+        
+        PS->>DB: 6.6 INSERT INTO file_outbox_row_audit<br/>(old='FAILED', new='PUBLISHED',<br/>retry_count=1,<br/>transitioned_by='PUBLISHER')
+        activate DB
+        deactivate DB
+    end
+
+    %% Second Consumption - Success
+    rect rgb(252, 228, 236)
+        Note over K,DM: 7. EVIDENCE WORKER - SECOND ATTEMPT (SUCCESS)
+        K->>EW: 7.1 Consume event {retry_count: 1}
+        activate EW
+        
+        EW->>DB: 7.2 SELECT * FROM file_job_artifact
+        activate DB
+        DB-->>EW: Evidence files
+        deactivate DB
+        
+        EW->>DM: 7.3 POST /attach-evidence (retry)
+        activate DM
+        DM-->>EW: ✅ 200 OK (API recovered)
+        deactivate DM
+        
+        EW->>DB: 7.4 UPDATE file_job_artifact<br/>SET attachment_status='ATTACHED'
+        activate DB
+        deactivate DB
+        
+        EW->>DB: 7.5 UPDATE file_outbox_row<br/>SET status='SUCCESS'
+        activate DB
+        deactivate DB
+        
+        EW->>DB: 7.6 INSERT INTO file_outbox_row_audit<br/>(old='PUBLISHED', new='SUCCESS',<br/>retry_count=1,<br/>transitioned_by='EVIDENCE_WORKER')
+        activate DB
+        deactivate DB
+        deactivate EW
+    end
+
+    %% Second Consumption - Final Failure
+    rect rgb(252, 228, 236)
+        Note over K,DM: 8. EVIDENCE WORKER - THIRD ATTEMPT (FINAL FAILURE)
+        Note over EW: (Some rows fail even after retry_count=2)
+        K->>EW: 8.1 Consume event {retry_count: 2}
+        activate EW
+        
+        EW->>DM: 8.2 POST /attach-evidence (final attempt)
+        activate DM
+        DM-->>EW: ❌ 500 Internal Server Error (persistent)
+        deactivate DM
+        
+        EW->>DB: 8.3 UPDATE file_outbox_row<br/>SET status='ERROR',<br/>retry_count=2,<br/>error_code='MAX_RETRIES_EXCEEDED'
+        activate DB
+        deactivate DB
+        
+        EW->>DB: 8.4 INSERT INTO file_outbox_row_audit<br/>(old='PUBLISHED', new='ERROR',<br/>retry_count=2,<br/>transitioned_by='EVIDENCE_WORKER')
+        activate DB
+        deactivate DB
+        deactivate EW
+    end
+
+    %% N2 Notification
+    rect rgb(255, 249, 196)
+        Note over NS,M: 9. N2 NOTIFICATION - ALL RETRIES COMPLETE
+        NS->>DB: 9.1 Check if all rows terminal<br/>SELECT COUNT(*)<br/>WHERE file_job_id=?<br/>AND status IN ('SUCCESS','ERROR')
+        activate DB
+        DB-->>NS: Count = total_rows (all done)
+        deactivate DB
+        
+        NS->>DB: 9.2 SELECT status, COUNT(*)<br/>WHERE file_job_id=?<br/>GROUP BY status
+        activate DB
+        DB-->>NS: {SUCCESS: 995, ERROR: 5}
+        deactivate DB
+        
+        NS->>DB: 9.3 UPDATE file_job<br/>SET status='COMPLETED',<br/>success_count=995,<br/>error_count=5,<br/>completed_at=NOW()
+        activate DB
+        deactivate DB
+        
+        NS->>M: 9.4 Send N2 Notification<br/>"Final Results: 995 success, 5 errors"
+        activate M
+        M-->>NS: Notification received
+        deactivate M
+    end
+
+    Note over S3,M: ✅ PROCESS COMPLETE - ALL ROWS IN TERMINAL STATE
